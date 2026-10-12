@@ -11,20 +11,27 @@ const Login = ({ onLogin }) => {
 
     const navigate = useNavigate();
 
-    // Redirect according to the user's role
+    // Normalize role and select the correct dashboard
     const getDashboardPath = (role) => {
-        const paths = {
+        const normalizedRole = String(role || "")
+            .trim()
+            .toLowerCase()
+            .replace(/[\s-]+/g, "_");
+
+        const dashboardPaths = {
             admin: "/admin",
             manager: "/admin",
-            receptionist: "/reception/billing",
+            receptionist: "/admin/billing",
             waiter: "/waiter",
-            kitchen: "/kitchen/orders",
+            kitchen: "/kitchen",
             customer: "/rooms",
+            user: "/rooms",
         };
 
-        return paths[String(role || "").toLowerCase()] || "/rooms";
+        return dashboardPaths[normalizedRole] || "/rooms";
     };
 
+    // Login handler
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
@@ -49,33 +56,42 @@ const Login = ({ onLogin }) => {
                 !response?.token ||
                 !response?.user
             ) {
-                setError(response?.message || "Login failed.");
+                setError(
+                    response?.message || "Login failed."
+                );
                 return;
             }
 
-            // Save authentication details
+            const user = response.user;
+
+            console.log("Logged-in user:", user);
+            console.log("Logged-in role:", user.role);
+
+            // Save authentication information
             localStorage.setItem("token", response.token);
             localStorage.setItem(
                 "user",
-                JSON.stringify(response.user)
+                JSON.stringify(user)
             );
 
-            // Update App.jsx login state
+            // Update App login state
             if (onLogin) {
-                onLogin(response.user);
+                onLogin(user);
             }
 
-            // Redirect to role-specific dashboard
-            navigate(
-                getDashboardPath(response.user.role),
-                { replace: true }
-            );
+            // Navigate to the correct dashboard
+            const dashboardPath = getDashboardPath(user.role);
+
+            console.log("Redirecting to:", dashboardPath);
+
+            navigate(dashboardPath, {
+                replace: true,
+            });
         } catch (error) {
             console.error("Login Error:", error);
 
             setError(
                 error.response?.data?.message ||
-                error.message ||
                 "Unable to login. Please check the server."
             );
         } finally {
@@ -100,11 +116,15 @@ const Login = ({ onLogin }) => {
                 >
                     {/* EMAIL */}
                     <div>
-                        <label className="block mb-2 font-medium">
+                        <label
+                            htmlFor="login-email"
+                            className="block mb-2 font-medium"
+                        >
                             Email
                         </label>
 
                         <input
+                            id="login-email"
                             type="email"
                             value={email}
                             onChange={(e) =>
@@ -119,11 +139,15 @@ const Login = ({ onLogin }) => {
 
                     {/* PASSWORD */}
                     <div>
-                        <label className="block mb-2 font-medium">
+                        <label
+                            htmlFor="login-password"
+                            className="block mb-2 font-medium"
+                        >
                             Password
                         </label>
 
                         <input
+                            id="login-password"
                             type="password"
                             value={password}
                             onChange={(e) =>
@@ -152,7 +176,9 @@ const Login = ({ onLogin }) => {
                         disabled={loading}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg disabled:opacity-50"
                     >
-                        {loading ? "Logging in..." : "Login"}
+                        {loading
+                            ? "Logging in..."
+                            : "Login"}
                     </button>
                 </form>
             </div>

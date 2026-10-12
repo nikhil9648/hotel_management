@@ -1,6 +1,4 @@
-
-import { useState } from "react";
-
+import React, { useState } from "react";
 import {
     Routes,
     Route,
@@ -15,7 +13,6 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import MyBookings from "./pages/MyBookings";
 import BookRoom from "./pages/BookRoom";
 import BookingDetails from "./pages/BookingDetails";
-
 import Menu from "./pages/Menu";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
@@ -29,7 +26,6 @@ import AdminBookings from "./pages/AdminBookings";
 import AdminRooms from "./pages/AdminRooms";
 import AdminRoomTypes from "./pages/AdminRoomTypes";
 import AdminRoomBooking from "./pages/AdminRoomBooking";
-
 import AdminLayout from "./components/AdminLayout";
 
 // Kitchen and Reception
@@ -51,37 +47,35 @@ import WaiterOrders from "./waiter/WaiterOrders";
 import AdminRestaurantOrders from "./pages/AdminRestaurantOrders";
 
 function App() {
-    // ==========================================
     // LOGIN STATE
-    // ==========================================
-
     const [isLoggedIn, setIsLoggedIn] = useState(
         Boolean(localStorage.getItem("token"))
     );
 
     const [currentUser, setCurrentUser] = useState(() => {
         try {
-            return JSON.parse(
-                localStorage.getItem("user") || "null"
-            );
+            return JSON.parse(localStorage.getItem("user") || "null");
         } catch {
             return null;
         }
     });
 
-    // ==========================================
-    // LOGIN CALLBACK
-    // ==========================================
+    // NORMALIZE ROLE
+    const normalizedRole = String(currentUser?.role || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, "_");
 
+    // CUSTOMER ONLY
+    const isCustomer = ["customer", "user"].includes(normalizedRole);
+
+    // LOGIN CALLBACK
     const handleLogin = (user) => {
         setCurrentUser(user);
         setIsLoggedIn(true);
     };
 
-    // ==========================================
     // LOGOUT
-    // ==========================================
-
     const handleLogout = () => {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -90,63 +84,79 @@ function App() {
         setIsLoggedIn(false);
     };
 
-    // ==========================================
     // LOGIN PAGE
-    // ==========================================
-
     if (!isLoggedIn) {
         return <Login onLogin={handleLogin} />;
     }
 
-    // ==========================================
     // LOGGED-IN APPLICATION
-    // ==========================================
-
     return (
-        <div className="app-root min-h-screen">
-            {/* Shared hospitality navigation; all existing links and logout action remain available. */}
-            <div className="app-topbar">
+        <div className="min-h-screen bg-gray-50">
+            {/* NAVBAR */}
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-gray-900 p-4 text-white">
                 <Link
-                    to="/rooms"
-                    className="brand-lockup"
+                    to="/"
+                    className="text-xl font-bold hover:text-gray-300"
                 >
-                    <span className="brand-mark" aria-hidden="true">H</span>
-                    <span><strong>Hotel &amp; Restaurant</strong><small>HOSPITALITY MANAGEMENT</small></span>
+                    🏨 Hotel &amp; Restaurant
                 </Link>
 
-                <nav className="app-navigation" aria-label="Main navigation">
-                    <Link to="/rooms" className="app-nav-link">
-                        <span>Stay</span>
-                    </Link>
-                    <Link to="/menu" className="app-nav-link">
-                        <span>Dining</span>
-                    </Link>
-                    <Link to="/cart" className="app-nav-link">
-                        <span>Cart</span>
-                    </Link>
-                    <Link to="/my-orders" className="app-nav-link">
-                        <span>Orders</span>
-                    </Link>
-                    <Link to="/my-bookings" className="app-nav-link">
-                        <span>Bookings</span>
-                    </Link>
-                </nav>
-
-                <div className="app-account">
-                    <span className="account-avatar" aria-hidden="true">
-                        {(currentUser?.name || currentUser?.fullName || currentUser?.email || "U").charAt(0).toUpperCase()}
-                    </span>
-                    <span className="account-copy">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2 py-2 text-sm text-gray-200">
                         {currentUser?.name ||
                             currentUser?.fullName ||
                             currentUser?.email ||
                             "User"}
-                        <small>{currentUser?.role || "Guest"}</small>
+                        {currentUser?.role
+                            ? ` (${currentUser.role})`
+                            : ""}
                     </span>
+
+                    {/* CUSTOMER NAVIGATION ONLY */}
+                    {isCustomer && (
+                        <>
+                            <Link
+                                to="/rooms"
+                                className="rounded bg-blue-600 px-4 py-2 hover:bg-blue-700"
+                            >
+                                🏨 Book Room
+                            </Link>
+
+                            <Link
+                                to="/menu"
+                                className="rounded bg-orange-600 px-4 py-2 hover:bg-orange-700"
+                            >
+                                🍽️ Menu
+                            </Link>
+
+                            <Link
+                                to="/cart"
+                                className="rounded bg-purple-600 px-4 py-2 hover:bg-purple-700"
+                            >
+                                🛒 Cart
+                            </Link>
+
+                            <Link
+                                to="/my-orders"
+                                className="rounded bg-yellow-600 px-4 py-2 hover:bg-yellow-700"
+                            >
+                                📦 My Orders
+                            </Link>
+
+                            <Link
+                                to="/my-bookings"
+                                className="rounded bg-green-600 px-4 py-2 hover:bg-green-700"
+                            >
+                                📋 My Bookings
+                            </Link>
+                        </>
+                    )}
+
+                    {/* LOGOUT FOR ALL ROLES */}
                     <button
                         type="button"
                         onClick={handleLogout}
-                        className="logout-button"
+                        className="rounded bg-red-600 px-4 py-2 hover:bg-red-700"
                     >
                         Logout
                     </button>
@@ -154,48 +164,88 @@ function App() {
             </div>
 
             {/* APPLICATION ROUTES */}
-            <main className="app-content">
             <Routes>
                 {/* HOME */}
                 <Route
                     path="/"
-                    element={<Navigate to="/rooms" replace />}
+                    element={
+                        <Navigate
+                            to={isCustomer ? "/rooms" : normalizedRole === "admin" || normalizedRole === "manager" ? "/admin" : normalizedRole === "waiter" ? "/waiter" : normalizedRole === "kitchen" ? "/kitchen" : normalizedRole === "receptionist" ? "/reception/billing" : "/rooms"}
+                            replace
+                        />
+                    }
                 />
 
                 {/* HOTEL ROOMS */}
                 <Route
                     path="/rooms"
-                    element={<Rooms />}
+                    element={
+                        isCustomer ? (
+                            <Rooms />
+                        ) : (
+                            <Navigate to="/" replace />
+                        )
+                    }
                 />
 
                 {/* BOOKING DETAILS */}
                 <Route
                     path="/booking-details"
-                    element={<BookingDetails />}
+                    element={
+                        isCustomer ? (
+                            <BookingDetails />
+                        ) : (
+                            <Navigate to="/" replace />
+                        )
+                    }
                 />
 
                 {/* BOOK ROOM */}
                 <Route
                     path="/book-room"
-                    element={<BookRoom />}
+                    element={
+                        isCustomer ? (
+                            <BookRoom />
+                        ) : (
+                            <Navigate to="/" replace />
+                        )
+                    }
                 />
 
                 {/* CUSTOMER MENU */}
                 <Route
                     path="/menu"
-                    element={<Menu />}
+                    element={
+                        isCustomer ? (
+                            <Menu />
+                        ) : (
+                            <Navigate to="/" replace />
+                        )
+                    }
                 />
 
                 {/* CUSTOMER CART */}
                 <Route
                     path="/cart"
-                    element={<Cart />}
+                    element={
+                        isCustomer ? (
+                            <Cart />
+                        ) : (
+                            <Navigate to="/" replace />
+                        )
+                    }
                 />
 
                 {/* CHECKOUT */}
                 <Route
                     path="/checkout"
-                    element={<Checkout />}
+                    element={
+                        isCustomer ? (
+                            <Checkout />
+                        ) : (
+                            <Navigate to="/" replace />
+                        )
+                    }
                 />
 
                 {/* KITCHEN */}
@@ -316,13 +366,25 @@ function App() {
                 {/* CUSTOMER ORDERS */}
                 <Route
                     path="/my-orders"
-                    element={<MyOrders />}
+                    element={
+                        isCustomer ? (
+                            <MyOrders />
+                        ) : (
+                            <Navigate to="/" replace />
+                        )
+                    }
                 />
 
                 {/* CUSTOMER BOOKINGS */}
                 <Route
                     path="/my-bookings"
-                    element={<MyBookings />}
+                    element={
+                        isCustomer ? (
+                            <MyBookings />
+                        ) : (
+                            <Navigate to="/" replace />
+                        )
+                    }
                 />
 
                 {/* PAYMENT SUCCESS */}
@@ -334,12 +396,12 @@ function App() {
                 {/* INVALID URL */}
                 <Route
                     path="*"
-                    element={<Navigate to="/rooms" replace />}
+                    element={<Navigate to="/" replace />}
                 />
             </Routes>
-            </main>
         </div>
     );
 }
 
 export default App;
+
