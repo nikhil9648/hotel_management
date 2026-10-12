@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import { useState } from "react";
 
 import {
     Routes,
@@ -103,66 +103,50 @@ function App() {
     // ==========================================
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* NAVBAR */}
-            <div className="flex flex-wrap items-center justify-between gap-4 bg-gray-900 p-4 text-white">
+        <div className="app-root min-h-screen">
+            {/* Shared hospitality navigation; all existing links and logout action remain available. */}
+            <div className="app-topbar">
                 <Link
                     to="/rooms"
-                    className="text-xl font-bold hover:text-gray-300"
+                    className="brand-lockup"
                 >
-                    🏨 Hotel & Restaurant
+                    <span className="brand-mark" aria-hidden="true">H</span>
+                    <span><strong>Hotel &amp; Restaurant</strong><small>HOSPITALITY MANAGEMENT</small></span>
                 </Link>
 
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-2 py-2 text-sm text-gray-200">
+                <nav className="app-navigation" aria-label="Main navigation">
+                    <Link to="/rooms" className="app-nav-link">
+                        <span>Stay</span>
+                    </Link>
+                    <Link to="/menu" className="app-nav-link">
+                        <span>Dining</span>
+                    </Link>
+                    <Link to="/cart" className="app-nav-link">
+                        <span>Cart</span>
+                    </Link>
+                    <Link to="/my-orders" className="app-nav-link">
+                        <span>Orders</span>
+                    </Link>
+                    <Link to="/my-bookings" className="app-nav-link">
+                        <span>Bookings</span>
+                    </Link>
+                </nav>
+
+                <div className="app-account">
+                    <span className="account-avatar" aria-hidden="true">
+                        {(currentUser?.name || currentUser?.fullName || currentUser?.email || "U").charAt(0).toUpperCase()}
+                    </span>
+                    <span className="account-copy">
                         {currentUser?.name ||
                             currentUser?.fullName ||
                             currentUser?.email ||
                             "User"}
-                        {currentUser?.role
-                            ? ` (${currentUser.role})`
-                            : ""}
+                        <small>{currentUser?.role || "Guest"}</small>
                     </span>
-
-                    <Link
-                        to="/rooms"
-                        className="rounded bg-blue-600 px-4 py-2 hover:bg-blue-700"
-                    >
-                        🏨 Book Room
-                    </Link>
-
-                    <Link
-                        to="/menu"
-                        className="rounded bg-orange-600 px-4 py-2 hover:bg-orange-700"
-                    >
-                        🍽️ Menu
-                    </Link>
-
-                    <Link
-                        to="/cart"
-                        className="rounded bg-purple-600 px-4 py-2 hover:bg-purple-700"
-                    >
-                        🛒 Cart
-                    </Link>
-
-                    <Link
-                        to="/my-orders"
-                        className="rounded bg-yellow-600 px-4 py-2 hover:bg-yellow-700"
-                    >
-                        📦 My Orders
-                    </Link>
-
-                    <Link
-                        to="/my-bookings"
-                        className="rounded bg-green-600 px-4 py-2 hover:bg-green-700"
-                    >
-                        📋 My Bookings
-                    </Link>
-
                     <button
                         type="button"
                         onClick={handleLogout}
-                        className="rounded bg-red-600 px-4 py-2 hover:bg-red-700"
+                        className="logout-button"
                     >
                         Logout
                     </button>
@@ -170,6 +154,7 @@ function App() {
             </div>
 
             {/* APPLICATION ROUTES */}
+            <main className="app-content">
             <Routes>
                 {/* HOME */}
                 <Route
@@ -352,6 +337,7 @@ function App() {
                     element={<Navigate to="/rooms" replace />}
                 />
             </Routes>
+            </main>
         </div>
     );
 }
