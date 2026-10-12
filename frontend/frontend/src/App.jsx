@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Routes,
     Route,
@@ -47,6 +47,28 @@ import WaiterOrders from "./waiter/WaiterOrders";
 import AdminRestaurantOrders from "./pages/AdminRestaurantOrders";
 
 function App() {
+    const [theme, setTheme] = useState(() =>
+        localStorage.getItem("hotel-theme") === "light" ? "light" : "dark"
+    );
+
+    useEffect(() => {
+        document.documentElement.dataset.theme = theme;
+        localStorage.setItem("hotel-theme", theme);
+    }, [theme]);
+
+    const toggleTheme = (
+        <button
+            type="button"
+            className="theme-toggle"
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+            aria-pressed={theme === "light"}
+            onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")}
+        >
+            <span aria-hidden="true">{theme === "dark" ? "☼" : "☾"}</span>
+            <span>{theme === "dark" ? "Light theme" : "Dark theme"}</span>
+        </button>
+    );
+
     // LOGIN STATE
     const [isLoggedIn, setIsLoggedIn] = useState(
         Boolean(localStorage.getItem("token"))
@@ -86,77 +108,85 @@ function App() {
 
     // LOGIN PAGE
     if (!isLoggedIn) {
-        return <Login onLogin={handleLogin} />;
+        return (
+            <>
+                <div className="login-theme-toggle">{toggleTheme}</div>
+                <Login onLogin={handleLogin} />
+            </>
+        );
     }
 
     // LOGGED-IN APPLICATION
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="app-root min-h-screen">
             {/* NAVBAR */}
-            <div className="flex flex-wrap items-center justify-between gap-4 bg-gray-900 p-4 text-white">
+            <div className="app-topbar">
                 <Link
                     to="/"
-                    className="text-xl font-bold hover:text-gray-300"
+                    className="brand-lockup"
                 >
-                    🏨 Hotel &amp; Restaurant
+                    <span className="brand-mark" aria-hidden="true">H</span>
+                    <span><strong>Hotel &amp; Restaurant</strong><small>HOSPITALITY MANAGEMENT</small></span>
                 </Link>
 
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-2 py-2 text-sm text-gray-200">
+                <div className="app-account">
+                    <span className="account-avatar" aria-hidden="true">
+                        {(currentUser?.name || currentUser?.fullName || currentUser?.email || "U").charAt(0).toUpperCase()}
+                    </span>
+                    <span className="account-copy">
                         {currentUser?.name ||
                             currentUser?.fullName ||
                             currentUser?.email ||
                             "User"}
-                        {currentUser?.role
-                            ? ` (${currentUser.role})`
-                            : ""}
+                        <small>{currentUser?.role || "Guest"}</small>
                     </span>
+                    {toggleTheme}
 
                     {/* CUSTOMER NAVIGATION ONLY */}
                     {isCustomer && (
-                        <>
+                        <nav className="app-navigation" aria-label="Main navigation">
                             <Link
                                 to="/rooms"
-                                className="rounded bg-blue-600 px-4 py-2 hover:bg-blue-700"
+                                className="app-nav-link"
                             >
-                                🏨 Book Room
+                                Stay
                             </Link>
 
                             <Link
                                 to="/menu"
-                                className="rounded bg-orange-600 px-4 py-2 hover:bg-orange-700"
+                                className="app-nav-link"
                             >
-                                🍽️ Menu
+                                Dining
                             </Link>
 
                             <Link
                                 to="/cart"
-                                className="rounded bg-purple-600 px-4 py-2 hover:bg-purple-700"
+                                className="app-nav-link"
                             >
-                                🛒 Cart
+                                Cart
                             </Link>
 
                             <Link
                                 to="/my-orders"
-                                className="rounded bg-yellow-600 px-4 py-2 hover:bg-yellow-700"
+                                className="app-nav-link"
                             >
-                                📦 My Orders
+                                Orders
                             </Link>
 
                             <Link
                                 to="/my-bookings"
-                                className="rounded bg-green-600 px-4 py-2 hover:bg-green-700"
+                                className="app-nav-link"
                             >
-                                📋 My Bookings
+                                Bookings
                             </Link>
-                        </>
+                        </nav>
                     )}
 
                     {/* LOGOUT FOR ALL ROLES */}
                     <button
                         type="button"
                         onClick={handleLogout}
-                        className="rounded bg-red-600 px-4 py-2 hover:bg-red-700"
+                        className="logout-button"
                     >
                         Logout
                     </button>
