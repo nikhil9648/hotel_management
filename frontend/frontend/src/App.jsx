@@ -4,6 +4,8 @@ import {
     Route,
     Navigate,
     Link,
+    NavLink,
+    useLocation,
 } from "react-router-dom";
 
 // Customer Pages
@@ -47,6 +49,7 @@ import WaiterOrders from "./waiter/WaiterOrders";
 import AdminRestaurantOrders from "./pages/AdminRestaurantOrders";
 
 function App() {
+    const location = useLocation();
     const [theme, setTheme] = useState(() =>
         localStorage.getItem("hotel-theme") === "light" ? "light" : "dark"
     );
@@ -64,7 +67,16 @@ function App() {
             aria-pressed={theme === "light"}
             onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")}
         >
-            <span aria-hidden="true">{theme === "dark" ? "☼" : "☾"}</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                {theme === "dark" ? (
+                    <>
+                        <circle cx="12" cy="12" r="4" />
+                        <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
+                    </>
+                ) : (
+                    <path d="M20.9 13.1A8.5 8.5 0 0 1 10.9 3.1 8.5 8.5 0 1 0 20.9 13.1Z" />
+                )}
+            </svg>
             <span>{theme === "dark" ? "Light theme" : "Dark theme"}</span>
         </button>
     );
@@ -118,15 +130,15 @@ function App() {
 
     // LOGGED-IN APPLICATION
     return (
-        <div className="app-root min-h-screen">
+        <div className={`app-root min-h-screen${isCustomer ? " customer-app" : ""}`}>
             {/* NAVBAR */}
-            <div className="app-topbar">
+            <div className={`app-topbar${isCustomer ? " customer-topbar" : ""}`}>
                 <Link
                     to="/"
                     className="brand-lockup"
                 >
                     <span className="brand-mark" aria-hidden="true">H</span>
-                    <span><strong>Hotel &amp; Restaurant</strong><small>HOSPITALITY MANAGEMENT</small></span>
+                        <span><strong>Hotel &amp; Restaurant</strong><small>{isCustomer ? "YOUR STAY, CONSIDERED" : "HOSPITALITY MANAGEMENT"}</small></span>
                 </Link>
 
                 <div className="app-account">
@@ -145,40 +157,40 @@ function App() {
                     {/* CUSTOMER NAVIGATION ONLY */}
                     {isCustomer && (
                         <nav className="app-navigation" aria-label="Main navigation">
-                            <Link
+                            <NavLink
                                 to="/rooms"
-                                className="app-nav-link"
+                                className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}
                             >
                                 Stay
-                            </Link>
+                            </NavLink>
 
-                            <Link
+                            <NavLink
                                 to="/menu"
-                                className="app-nav-link"
+                                className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}
                             >
                                 Dining
-                            </Link>
+                            </NavLink>
 
-                            <Link
+                            <NavLink
                                 to="/cart"
-                                className="app-nav-link"
+                                className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}
                             >
                                 Cart
-                            </Link>
+                            </NavLink>
 
-                            <Link
+                            <NavLink
                                 to="/my-orders"
-                                className="app-nav-link"
+                                className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}
                             >
                                 Orders
-                            </Link>
+                            </NavLink>
 
-                            <Link
+                            <NavLink
                                 to="/my-bookings"
-                                className="app-nav-link"
+                                className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}
                             >
                                 Bookings
-                            </Link>
+                            </NavLink>
                         </nav>
                     )}
 
@@ -193,6 +205,22 @@ function App() {
                 </div>
             </div>
 
+            {/* Customer-only presentation shell keeps each existing route and data workflow intact. */}
+            <div className={isCustomer ? "customer-experience" : "app-content"}>
+            {isCustomer && location.pathname === "/rooms" && (
+                <section className="customer-welcome" aria-labelledby="customer-welcome-title">
+                    <div className="customer-welcome-copy">
+                        <p className="customer-eyebrow"><span /> A MORE THOUGHTFUL WAY TO STAY</p>
+                        <h1 id="customer-welcome-title">Make room for <em>something wonderful.</em></h1>
+                        <p>Your dates, your pace, and a little more room to enjoy the journey.</p>
+                    </div>
+                    <div className="welcome-orbit" aria-hidden="true">
+                        <span className="orbit orbit-one" />
+                        <span className="orbit orbit-two" />
+                        <span className="orbit-core"><svg viewBox="0 0 48 48" fill="none"><path d="M8 30V18l16-9 16 9v12M12 28h24M16 28v10m16-10v10M9 38h30" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+                    </div>
+                </section>
+            )}
             {/* APPLICATION ROUTES */}
             <Routes>
                 {/* HOME */}
@@ -429,6 +457,7 @@ function App() {
                     element={<Navigate to="/" replace />}
                 />
             </Routes>
+            </div>
         </div>
     );
 }

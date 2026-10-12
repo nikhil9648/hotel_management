@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
@@ -90,11 +90,11 @@ const Rooms = () => {
 
 
     return (
-        <div className="min-h-screen bg-gray-100 p-6">
+        <div className="min-h-screen bg-gray-100 p-6 customer-rooms-page">
 
             <div className="max-w-6xl mx-auto">
 
-                <h1 className="text-4xl font-bold mb-2">
+                <h1 className="text-4xl font-bold mb-2 customer-section-title">
                     Find a Room
                 </h1>
 
