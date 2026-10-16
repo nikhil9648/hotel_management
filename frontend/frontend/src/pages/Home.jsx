@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import HomeProfileMenu from "../components/HomeProfileMenu";
 import {
     Search,
     ShoppingCart,
@@ -17,15 +18,77 @@ import {
 import "../styles/Home.css";
 
 const categories = [
-    { name: "All", icon: "✦" },
-    { name: "North Indian", icon: "🍛" },
-    { name: "South Indian", icon: "🥞" },
-    { name: "Chinese", icon: "🍜" },
-    { name: "Pizza & Snacks", icon: "🍕" },
-    { name: "Thalis", icon: "🍱" },
-    { name: "Desserts", icon: "🍰" },
-    { name: "Beverages", icon: "🥤" },
+{
+name: "North Indian",
+image: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=240&auto=format&fit=crop&q=80",
+},
+{
+name: "Burger",
+image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=240&auto=format&fit=crop&q=80",
+filter: null,
+},
+{
+name: "Pizza",
+image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=240&auto=format&fit=crop&q=80",
+filter: "Pizza & Snacks",
+},
+{
+name: "Desserts",
+image: "https://images.unsplash.com/photo-1551024506-0bcf5f8a9b8d?w=240&auto=format&fit=crop&q=80",
+filter: "Desserts",
+},
+{
+name: "Biryani",
+image: "https://images.unsplash.com/photo-1563379091339-03246963d96c?w=240&auto=format&fit=crop&q=80",
+filter: null,
+},
+{
+name: "Cake",
+image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=240&auto=format&fit=crop&q=80",
+filter: "Desserts",
+},
+{
+name: "Rolls",
+image: "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=240&auto=format&fit=crop&q=80",
+filter: null,
+},
+{
+name: "Noodles",
+image: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=240&auto=format&fit=crop&q=80",
+filter: "Chinese",
+},
+{
+name: "Pasta",
+image: "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=240&auto=format&fit=crop&q=80",
+filter: null,
+},
+{
+name: "Dosa",
+image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=240&auto=format&fit=crop&q=80",
+filter: "South Indian",
+},
+{
+name: "Paratha",
+image: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=240&auto=format&fit=crop&q=80",
+filter: "North Indian",
+},
+{
+name: "Salad",
+image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=240&auto=format&fit=crop&q=80",
+filter: null,
+},
+{
+name: "Coffee",
+image: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=240&auto=format&fit=crop&q=80",
+filter: "Beverages",
+},
+{
+name: "Pastry",
+image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=240&auto=format&fit=crop&q=80",
+filter: "Desserts",
+},
 ];
+
 
 const dishes = [
     {
@@ -110,7 +173,11 @@ const dishes = [
     },
 ];
 
-export default function Home() {
+export default function Home({
+    isLoggedIn = Boolean(localStorage.getItem("token")),
+    currentUser = null,
+    onLogout,
+})  {
     const [category, setCategory] = useState("All");
     const [search, setSearch] = useState("");
 
@@ -254,9 +321,24 @@ export default function Home() {
                     <span>{cartCount}</span>
                 </Link>
 
-                <Link to="/login" className="maurya-login">
-                    Sign in
-                </Link>
+                <div className="maurya-login">
+    <HomeProfileMenu
+        isLoggedIn={isLoggedIn}
+        user={
+            currentUser ||
+            (() => {
+                try {
+                    return JSON.parse(
+                        localStorage.getItem("user") || "null"
+                    );
+                } catch {
+                    return null;
+                }
+            })()
+        }
+        onLogout={onLogout}
+    />
+</div>
             </header>
 
             {/* HERO */}
@@ -355,48 +437,87 @@ export default function Home() {
                 </div>
 
                 {/* CATEGORIES */}
-                <section className="category-section">
-                    <div className="section-heading">
-                        <div>
-                            <span className="section-kicker">
-                                EXPLORE THE MENU
-                            </span>
+                            {/* SWIGGY-STYLE FOOD CATEGORIES */}
+            <section className="category-section" id="categories">
+                <div className="swiggy-category-heading">
+                    <h2>Order our best food options</h2>
 
-                            <h2>What are you craving?</h2>
+                    <div className="category-arrows">
+                        <button
+                            type="button"
+                            aria-label="Scroll categories left"
+                            onClick={() =>
+                                document
+                                    .getElementById("category-grid")
+                                    ?.scrollBy({
+                                        left: -500,
+                                        behavior: "smooth",
+                                    })
+                            }
+                        >
+                            ‹
+                        </button>
 
-                            <p>
-                                Something delicious for every mood.
-                            </p>
-                        </div>
-
-                        <span className="heading-flower">✺</span>
+                        <button
+                            type="button"
+                            aria-label="Scroll categories right"
+                            onClick={() =>
+                                document
+                                    .getElementById("category-grid")
+                                    ?.scrollBy({
+                                        left: 500,
+                                        behavior: "smooth",
+                                    })
+                            }
+                        >
+                            ›
+                        </button>
                     </div>
+                </div>
 
-                    <div className="category-row">
-                        {categories.map((item) => (
-                            <button
-                                key={item.name}
-                                type="button"
-                                onClick={() =>
-                                    setCategory(item.name)
+                <div className="swiggy-category-grid" id="category-grid">
+                    {categories.map((item) => (
+                        <button
+                            type="button"
+                            className={`swiggy-category-item ${
+                                category === (item.filter || item.name)
+                                    ? "selected"
+                                    : ""
+                            }`}
+                            key={item.name}
+                            onClick={() => {
+                                if (item.filter) {
+                                    setCategory(item.filter);
+                                    document
+                                        .getElementById("menu")
+                                        ?.scrollIntoView({
+                                            behavior: "smooth",
+                                        });
+                                } else {
+                                    setSearch(item.name);
+                                    document
+                                        .getElementById("menu")
+                                        ?.scrollIntoView({
+                                            behavior: "smooth",
+                                        });
                                 }
-                                className={`category-pill ${
-                                    category === item.name
-                                        ? "selected"
-                                        : ""
-                                }`}
-                            >
-                                <span>{item.icon}</span>
+                            }}
+                        >
+                            <div className="swiggy-category-image">
+                                <img
+                                    src={item.image}
+                                    alt={item.name}
+                                    loading="lazy"
+                                />
+                            </div>
 
-                                <strong>
-                                    {item.name === "All"
-                                        ? "All dishes"
-                                        : item.name}
-                                </strong>
-                            </button>
-                        ))}
-                    </div>
-                </section>
+                            <span>{item.name}</span>
+                        </button>
+                    ))}
+                </div>
+            </section>
+
+
 
                 {/* FOOD MENU */}
                 <section className="menu-section" id="menu">
@@ -599,7 +720,7 @@ export default function Home() {
                 <div>
                     <a href="#menu">Menu</a>
                     <Link to="/rooms">Rooms</Link>
-                    <Link to="/login">Sign in</Link>
+                    {!isLoggedIn && <Link to="/login">Sign in</Link>}
                 </div>
 
                 <small>

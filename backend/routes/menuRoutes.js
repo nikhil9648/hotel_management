@@ -1,4 +1,6 @@
 const express = require("express");
+const upload = require("../middleware/upload");
+// const { protect, authorize } = require("../middleware/authMiddleware");
 
 const {
     createCategory,
@@ -46,6 +48,51 @@ router.put(
     authorize("admin"),
     updateCategory
 );
+
+router.post(
+    "/upload-image",
+    protect,
+    authorize("admin"),
+    upload.single("image"),
+    (req, res) => {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "Please select an image to upload.",
+            });
+        }
+
+        const imageUrl =
+            `${req.protocol}://${req.get("host")}` +
+            `/uploads/food-images/${req.file.filename}`;
+
+        return res.status(201).json({
+            success: true,
+            message: "Image uploaded successfully.",
+            imageUrl,
+        });
+    }
+);
+router.use((error, req, res, next) => {
+    if (error instanceof require("multer").MulterError) {
+        return res.status(400).json({
+            success: false,
+            message:
+                error.code === "LIMIT_FILE_SIZE"
+                    ? "Image size must not exceed 5 MB."
+                    : error.message,
+        });
+    }
+
+    if (error) {
+        return res.status(400).json({
+            success: false,
+            message: error.message || "Image upload failed.",
+        });
+    }
+
+    next();
+});
 
 router.delete(
     "/categories/:id",

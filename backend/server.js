@@ -25,6 +25,7 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 const http = require("http");
+const path = require("path");
 
 const authRoutes = require("./routes/authRoutes");
 const roomRoutes = require("./routes/roomRoutes");
@@ -43,6 +44,9 @@ const restaurantBillRoutes = require(
 
 // ADMIN ROUTES
 const adminRoutes = require("./routes/adminRoutes");
+const customerAuthRoutes = require("./routes/customerAuthRoutes");
+
+
 
 const connectDB = require("./config/db");
 
@@ -74,7 +78,10 @@ app.use(
 
 app.use(helmet());
 app.use(morgan("dev"));
-
+app.use(
+    "/uploads",
+    express.static(path.join(__dirname, "uploads"))
+);
 app.use(express.json());
 
 app.use(
@@ -105,7 +112,7 @@ app.use(
     "/api/restaurant-orders",
     restaurantOrderRoutes
 );
-
+app.use("/api/customer-auth", customerAuthRoutes);
 app.use("/api/kots", kotRoutes);
 
 app.use(

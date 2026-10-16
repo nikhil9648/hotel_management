@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginUser } from "../services/authService";
+import { Link } from "react-router-dom";
 
 const Login = ({ onLogin }) => {
     const [email, setEmail] = useState("");
@@ -180,6 +181,10 @@ const Login = ({ onLogin }) => {
                             ? "Logging in..."
                             : "Login"}
                     </button>
+                    <p className="signup-login-link">
+    Don't have an account?{" "}
+    <Link to="/signup">Sign Up</Link>
+</p>
                 </form>
             </div>
         </div>

@@ -1,6 +1,5 @@
 
 import { useEffect, useState } from "react";
-
 import {
     Routes,
     Route,
@@ -11,6 +10,8 @@ import {
 } from "react-router-dom";
 
 import Home from "./pages/Home";
+import Signup from "./pages/Signup";
+import Profile from "./pages/Profile";
 
 // Customer Pages
 import Login from "./pages/Login";
@@ -34,6 +35,9 @@ import AdminRoomTypes from "./pages/AdminRoomTypes";
 import AdminRoomBooking from "./pages/AdminRoomBooking";
 import AdminLayout from "./components/AdminLayout";
 import AdminRestaurantOrders from "./pages/AdminRestaurantOrders";
+import GeneralPOS from "./pages/admin/GeneralPOS";
+import GeneralProductManagement from "./pages/admin/GeneralProductManagement";
+import GeneralBillHistory from "./pages/admin/GeneralBillHistory";
 
 // Kitchen and Reception
 import KitchenKOT from "./pages/KitchenKOT";
@@ -88,12 +92,7 @@ function App() {
 
     const isCustomer = ["customer", "user"].includes(normalizedRole);
 
-    const isAdmin = ["admin", "manager"].includes(normalizedRole);
-    const isWaiter = normalizedRole === "waiter";
-    const isKitchen = normalizedRole === "kitchen";
-    const isReceptionist = normalizedRole === "receptionist";
-
-    // Default destination after login
+    // Default destination by role
     const getDashboardPath = (role) => {
         const normalized = String(role || "")
             .trim()
@@ -117,27 +116,28 @@ function App() {
         }
 
         if (["customer", "user"].includes(normalized)) {
-            return "/rooms";
-        }
+    return "/";
+}
 
         return "/";
     };
 
     // Login callback
     const handleLogin = (user) => {
-        const savedUser = user || (() => {
+        let savedUser = user;
+
+        if (!savedUser) {
             try {
-                return JSON.parse(localStorage.getItem("user") || "null");
+                savedUser = JSON.parse(
+                    localStorage.getItem("user") || "null"
+                );
             } catch {
-                return null;
+                savedUser = null;
             }
-        })();
+        }
 
         setCurrentUser(savedUser);
         setIsLoggedIn(Boolean(localStorage.getItem("token")));
-
-        // The Login component should save the token before calling onLogin.
-        // If it does not, the login page can still handle its own flow.
     };
 
     // Logout
@@ -147,6 +147,7 @@ function App() {
 
         setCurrentUser(null);
         setIsLoggedIn(false);
+
         window.location.href = "/";
     };
 
@@ -155,7 +156,9 @@ function App() {
         <button
             type="button"
             className="theme-toggle"
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+            aria-label={`Switch to ${
+                theme === "dark" ? "light" : "dark"
+            } theme`}
             aria-pressed={theme === "light"}
             onClick={() =>
                 setTheme((current) =>
@@ -181,7 +184,6 @@ function App() {
                     <path d="M20.9 13.1A8.5 8.5 0 0 1 10.9 3.1 8.5 8.5 0 1 0 20.9 13.1Z" />
                 )}
             </svg>
-
             <span>
                 {theme === "dark" ? "Light theme" : "Dark theme"}
             </span>
@@ -201,7 +203,12 @@ function App() {
         }
 
         if (!isCustomer) {
-            return <Navigate to={getDashboardPath(normalizedRole)} replace />;
+            return (
+                <Navigate
+                    to={getDashboardPath(normalizedRole)}
+                    replace
+                />
+            );
         }
 
         return element;
@@ -220,7 +227,12 @@ function App() {
         }
 
         if (!allowedRoles.includes(normalizedRole)) {
-            return <Navigate to={getDashboardPath(normalizedRole)} replace />;
+            return (
+                <Navigate
+                    to={getDashboardPath(normalizedRole)}
+                    replace
+                />
+            );
         }
 
         return element;
@@ -232,108 +244,46 @@ function App() {
                 isCustomer ? " customer-app" : ""
             }`}
         >
-            {/* NAVBAR */}
-            <header
-                className={`app-topbar${
-                    isCustomer ? " customer-topbar" : ""
-                }`}
-            >
-                <Link to="/" className="brand-lockup">
-                    <span className="brand-mark" aria-hidden="true">
-                        H
-                    </span>
+            {/* STAFF NAVBAR ONLY.
+                Customer navbar is managed by Home.jsx. */}
+            {isLoggedIn && !isCustomer && (
+                <header className="app-topbar">
+                    <Link to="/" className="brand-lockup">
+                        <span className="brand-mark" aria-hidden="true">
+                            H
+                        </span>
 
-                    <span>
-                        <strong>Hotel &amp; Restaurant</strong>
-                        <small>
-                            {isCustomer
-                                ? "YOUR STAY, CONSIDERED"
-                                : "HOSPITALITY MANAGEMENT"}
-                        </small>
-                    </span>
-                </Link>
+                        <span>
+                            <strong>Hotel &amp; Restaurant</strong>
+                            <small>HOSPITALITY MANAGEMENT</small>
+                        </span>
+                    </Link>
 
-                <div className="app-account">
-                    {isLoggedIn ? (
-                        <>
-                            <span className="account-avatar" aria-hidden="true">
-                                {(
-                                    currentUser?.name ||
-                                    currentUser?.fullName ||
-                                    currentUser?.email ||
-                                    "U"
-                                )
-                                    .charAt(0)
-                                    .toUpperCase()}
-                            </span>
-
-                            <span className="account-copy">
-                                {currentUser?.name ||
-                                    currentUser?.fullName ||
-                                    currentUser?.email ||
-                                    "User"}
-
-                                <small>{currentUser?.role || "User"}</small>
-                            </span>
-                        </>
-                    ) : null}
-
-                    {toggleTheme}
-
-                    {/* Customer navigation */}
-                    {isLoggedIn && isCustomer && (
-                        <nav
-                            className="app-navigation"
-                            aria-label="Main navigation"
+                    <div className="app-account">
+                        <span
+                            className="account-avatar"
+                            aria-hidden="true"
                         >
-                            <NavLink
-                                to="/rooms"
-                                className={({ isActive }) =>
-                                    `app-nav-link${isActive ? " active" : ""}`
-                                }
-                            >
-                                Stay
-                            </NavLink>
+                            {(
+                                currentUser?.name ||
+                                currentUser?.fullName ||
+                                currentUser?.email ||
+                                "U"
+                            )
+                                .charAt(0)
+                                .toUpperCase()}
+                        </span>
 
-                            <NavLink
-                                to="/menu"
-                                className={({ isActive }) =>
-                                    `app-nav-link${isActive ? " active" : ""}`
-                                }
-                            >
-                                Dining
-                            </NavLink>
+                        <span className="account-copy">
+                            {currentUser?.name ||
+                                currentUser?.fullName ||
+                                currentUser?.email ||
+                                "User"}
+                            <small>{currentUser?.role || "User"}</small>
+                        </span>
 
-                            <NavLink
-                                to="/cart"
-                                className={({ isActive }) =>
-                                    `app-nav-link${isActive ? " active" : ""}`
-                                }
-                            >
-                                Cart
-                            </NavLink>
+                        {toggleTheme}
 
-                            <NavLink
-                                to="/my-orders"
-                                className={({ isActive }) =>
-                                    `app-nav-link${isActive ? " active" : ""}`
-                                }
-                            >
-                                Orders
-                            </NavLink>
-
-                            <NavLink
-                                to="/my-bookings"
-                                className={({ isActive }) =>
-                                    `app-nav-link${isActive ? " active" : ""}`
-                                }
-                            >
-                                Bookings
-                            </NavLink>
-                        </nav>
-                    )}
-
-                    {isLoggedIn ? (
                         <button
                             type="button"
                             onClick={handleLogout}
@@ -341,15 +291,10 @@ function App() {
                         >
                             Logout
                         </button>
-                    ) : (
-                        <Link to="/login" className="logout-button">
-                            Login
-                        </Link>
-                    )}
-                </div>
-            </header>
+                    </div>
+                </header>
+            )}
 
-            {/* PAGE CONTENT */}
             <div
                 className={
                     isCustomer && isLoggedIn
@@ -367,7 +312,8 @@ function App() {
                         >
                             <div className="customer-welcome-copy">
                                 <p className="customer-eyebrow">
-                                    <span /> A MORE THOUGHTFUL WAY TO STAY
+                                    <span />
+                                    A MORE THOUGHTFUL WAY TO STAY
                                 </p>
 
                                 <h1 id="customer-welcome-title">
@@ -381,10 +327,12 @@ function App() {
                                 </p>
                             </div>
 
-                            <div className="welcome-orbit" aria-hidden="true">
+                            <div
+                                className="welcome-orbit"
+                                aria-hidden="true"
+                            >
                                 <span className="orbit orbit-one" />
                                 <span className="orbit orbit-two" />
-
                                 <span className="orbit-core">
                                     <svg viewBox="0 0 48 48" fill="none">
                                         <path
@@ -401,9 +349,19 @@ function App() {
                     )}
 
                 <Routes>
-                    {/* PUBLIC PAGES: no login required */}
-                    <Route path="/" element={<Home />} />
+                    {/* Public homepage */}
+                    <Route
+    path="/"
+    element={
+        <Home
+            isLoggedIn={isLoggedIn}
+            currentUser={currentUser}
+            onLogout={handleLogout}
+        />
+    }
+/>
 
+                    {/* Login */}
                     <Route
                         path="/login"
                         element={
@@ -418,50 +376,64 @@ function App() {
                         }
                     />
 
-                    {/* Public menu browsing */}
-                    <Route path="/menu" element={<Menu />} />
+                    {/* Customer signup */}
+                    <Route
+                        path="/signup"
+                        element={
+                            isLoggedIn ? (
+                                <Navigate
+                                    to={getDashboardPath(normalizedRole)}
+                                    replace
+                                />
+                            ) : (
+                                <Signup />
+                            )
+                        }
+                    />
 
-                    {/* Public room browsing */}
+                    {/* Customer profile */}
+                    <Route
+                        path="/profile"
+                        element={customerRoute(<Profile />)}
+                    />
+
+                    {/* Public browsing */}
+                    <Route path="/menu" element={<Menu />} />
                     <Route path="/rooms" element={<Rooms />} />
 
-                    {/* CUSTOMER PAGES */}
+                    {/* Customer pages */}
                     <Route
                         path="/booking-details"
                         element={customerRoute(<BookingDetails />)}
                     />
-
                     <Route
                         path="/book-room"
                         element={customerRoute(<BookRoom />)}
                     />
-
                     <Route
                         path="/cart"
                         element={customerRoute(<Cart />)}
                     />
-
                     <Route
                         path="/checkout"
                         element={customerRoute(<Checkout />)}
                     />
-
                     <Route
                         path="/my-orders"
                         element={customerRoute(<MyOrders />)}
                     />
-
                     <Route
                         path="/my-bookings"
                         element={customerRoute(<MyBookings />)}
                     />
 
-                    {/* PAYMENT SUCCESS */}
+                    {/* Payment success */}
                     <Route
                         path="/payment-success"
                         element={<PaymentSuccess />}
                     />
 
-                    {/* KITCHEN */}
+                    {/* Kitchen */}
                     <Route
                         path="/kitchen"
                         element={staffRoute(
@@ -469,24 +441,14 @@ function App() {
                             ["admin", "manager", "kitchen"]
                         )}
                     >
-                        <Route
-                            index
-                            element={staffRoute(
-                                <KitchenDashboard />,
-                                ["admin", "manager", "kitchen"]
-                            )}
-                        />
-
+                        <Route index element={<KitchenDashboard />} />
                         <Route
                             path="orders"
-                            element={staffRoute(
-                                <KitchenOrders />,
-                                ["admin", "manager", "kitchen"]
-                            )}
+                            element={<KitchenOrders />}
                         />
                     </Route>
 
-                    {/* RECEPTION BILLING */}
+                    {/* Reception */}
                     <Route
                         path="/reception/billing"
                         element={staffRoute(
@@ -494,7 +456,6 @@ function App() {
                             ["admin", "manager", "receptionist"]
                         )}
                     />
-
                     <Route
                         path="/restaurant-bill-history"
                         element={staffRoute(
@@ -503,7 +464,7 @@ function App() {
                         )}
                     />
 
-                    {/* ADMIN PANEL */}
+                    {/* Admin */}
                     <Route
                         path="/admin"
                         element={staffRoute(
@@ -512,62 +473,46 @@ function App() {
                         )}
                     >
                         <Route
-                            index
-                            element={<AdminDashboard />}
-                        />
-
-                        <Route
-                            path="staff"
-                            element={<AdminStaff />}
-                        />
-
+  path="/admin/general-products"
+  element={<GeneralProductManagement />}
+/>
+<Route
+  path="/admin/general-bill-history"
+  element={<GeneralBillHistory />}
+/>
+                        <Route index element={<AdminDashboard />} />
+                        <Route path="staff" element={<AdminStaff />} />
                         <Route
                             path="restaurant-orders"
                             element={<AdminRestaurantOrders />}
                         />
-
+                        <Route path="/admin/general-pos" element={<GeneralPOS />} />
                         <Route
                             path="bookings"
                             element={<AdminBookings />}
                         />
-
-                        <Route
-                            path="rooms"
-                            element={<AdminRooms />}
-                        />
-
+                        <Route path="rooms" element={<AdminRooms />} />
                         <Route
                             path="room-types"
                             element={<AdminRoomTypes />}
                         />
-
                         <Route
                             path="room-booking"
                             element={<AdminRoomBooking />}
                         />
-
-                        <Route
-                            path="menu"
-                            element={<AdminMenu />}
-                        />
-
-                        <Route
-                            path="kitchen"
-                            element={<KitchenKOT />}
-                        />
-
+                        <Route path="menu" element={<AdminMenu />} />
+                        <Route path="kitchen" element={<KitchenKOT />} />
                         <Route
                             path="billing"
                             element={<ReceptionBilling />}
                         />
-
                         <Route
                             path="bill-history"
                             element={<RestaurantBillHistory />}
                         />
                     </Route>
 
-                    {/* WAITER PANEL */}
+                    {/* Waiter */}
                     <Route
                         path="/waiter"
                         element={staffRoute(
@@ -575,28 +520,22 @@ function App() {
                             ["admin", "manager", "waiter"]
                         )}
                     >
-                        <Route
-                            index
-                            element={<WaiterDashboard />}
-                        />
-
+                        <Route index element={<WaiterDashboard />} />
                         <Route
                             path="tables"
                             element={<WaiterTables />}
                         />
-
                         <Route
                             path="create-order"
                             element={<CreateOrder />}
                         />
-
                         <Route
                             path="orders"
                             element={<WaiterOrders />}
                         />
                     </Route>
 
-                    {/* INVALID URL */}
+                    {/* Invalid URL */}
                     <Route
                         path="*"
                         element={<Navigate to="/" replace />}

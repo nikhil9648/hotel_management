@@ -1,0 +1,118 @@
+
+.signup-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 16px;
+    background: var(--bg, #f5f3ef);
+    box-sizing: border-box;
+}
+
+.signup-card {
+    width: 100%;
+    max-width: 440px;
+    padding: 32px;
+    border-radius: 18px;
+    background: var(--card-bg, #fff);
+    color: var(--text, #252525);
+    box-shadow: 0 12px 45px rgba(0, 0, 0, 0.09);
+    box-sizing: border-box;
+}
+
+.signup-brand {
+    display: inline-block;
+    margin-bottom: 24px;
+    color: #d96932;
+    font-size: 18px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.signup-card h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+}
+
+.signup-subtitle {
+    margin: 0 0 24px;
+    color: #777;
+    line-height: 1.6;
+}
+
+.signup-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.signup-card label {
+    margin-top: 5px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.signup-card input {
+    width: 100%;
+    min-height: 44px;
+    padding: 11px 12px;
+    border: 1px solid #d8d8d8;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    box-sizing: border-box;
+}
+
+.signup-card input:focus {
+    outline: 2px solid rgba(217, 105, 50, 0.25);
+    border-color: #d96932;
+}
+
+.signup-card form button {
+    min-height: 46px;
+    margin-top: 12px;
+    border: none;
+    border-radius: 8px;
+    background: #d96932;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.signup-card form button:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.signup-error {
+    margin-bottom: 16px;
+    padding: 11px;
+    border-radius: 8px;
+    background: #fff0f0;
+    color: #b42318;
+    font-size: 14px;
+}
+
+.signup-login-link {
+    margin: 22px 0 0;
+    text-align: center;
+    font-size: 14px;
+}
+
+.signup-login-link a {
+    color: #d96932;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+@media (max-width: 480px) {
+    .signup-card {
+        padding: 24px 18px;
+    }
+
+    .signup-card h1 {
+        font-size: 24px;
+    }
+}
