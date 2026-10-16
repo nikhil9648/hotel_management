@@ -7,6 +7,21 @@ const mongoose = require("mongoose");
 const restaurantOrderSchema = new mongoose.Schema(
     {
         // ORDER NUMBER
+
+        customerName: {
+            type: String,
+            required: [true, "Customer name is required"],
+            trim: true,
+            maxlength: 100,
+        },
+
+        customerMobile: {
+            type: String,
+            required: [true, "Customer mobile number is required"],
+            trim: true,
+            maxlength: 20,
+        },
+
         orderNumber: {
             type: String,
             unique: true,

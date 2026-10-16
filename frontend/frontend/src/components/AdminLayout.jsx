@@ -17,6 +17,7 @@ const menuItems = [
     { label: "Kitchen Orders", path: "/admin/kitchen", icon: "👨‍🍳" },
     { label: "Reception Billing", path: "/admin/billing", icon: "🧾" },
     { label: "Bill History", path: "/admin/bill-history", icon: "📑" },
+    { label: "Restaurant Tables", path: "/admin/restaurant-tables" },
     { label: "Product Billing", path: "/admin/general-pos" },
     { label: "General History", path: "/admin/general-bill-history" },
     { label: "Add POS Product", path: "/admin/general-products" },

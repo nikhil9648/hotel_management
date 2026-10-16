@@ -38,6 +38,8 @@ import AdminRestaurantOrders from "./pages/AdminRestaurantOrders";
 import GeneralPOS from "./pages/admin/GeneralPOS";
 import GeneralProductManagement from "./pages/admin/GeneralProductManagement";
 import GeneralBillHistory from "./pages/admin/GeneralBillHistory";
+import RestaurantTables from "./pages/admin/RestaurantTables";
+
 
 // Kitchen and Reception
 import KitchenKOT from "./pages/KitchenKOT";
@@ -472,6 +474,10 @@ function App() {
                             ["admin", "manager"]
                         )}
                     >
+                        <Route
+  path="/admin/restaurant-tables"
+  element={<RestaurantTables />}
+/>
                         <Route
   path="/admin/general-products"
   element={<GeneralProductManagement />}

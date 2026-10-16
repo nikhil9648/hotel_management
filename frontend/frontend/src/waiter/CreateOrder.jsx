@@ -1,63 +1,98 @@
+
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
 const API = "http://localhost:5000/api";
+const BACKEND_URL = "http://localhost:5000";
+
+const getImageUrl = (image) => {
+    if (!image || typeof image !== "string") return "";
+
+    const value = image.trim();
+    if (!value) return "";
+
+    if (/^https?:\/\//i.test(value)) return value;
+
+    const cleanPath = value.replace(/^\/+/, "");
+
+    if (cleanPath.startsWith("uploads/")) {
+        return `${BACKEND_URL}/${cleanPath}`;
+    }
+
+    if (cleanPath.startsWith("food-images/")) {
+        return `${BACKEND_URL}/uploads/${cleanPath}`;
+    }
+
+    return `${BACKEND_URL}/uploads/food-images/${cleanPath}`;
+};
 
 export default function CreateOrder() {
     const [foods, setFoods] = useState([]);
     const [tables, setTables] = useState([]);
     const [cart, setCart] = useState([]);
+
+    const [customerName, setCustomerName] = useState("");
+    const [customerMobile, setCustomerMobile] = useState("");
+
     const [tableId, setTableId] = useState("");
     const [search, setSearch] = useState("");
     const [category, setCategory] = useState("All");
     const [notes, setNotes] = useState("");
+
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [createdOrderNumber, setCreatedOrderNumber] = useState("");
+    const [createdAt, setCreatedAt] = useState("");
 
     const token = localStorage.getItem("token");
 
     const headers = useMemo(
-        () => ({ Authorization: `Bearer ${token}` }),
+        () => ({
+            Authorization: `Bearer ${token}`,
+        }),
         [token]
     );
 
-    useEffect(() => {
-        const loadData = async () => {
-            setLoading(true);
-            setError("");
+    const loadData = async () => {
+        setLoading(true);
+        setError("");
 
-            try {
-                const [foodResponse, tableResponse] = await Promise.all([
-                    axios.get(`${API}/menu/foods?isAvailable=true`, {
-                        headers,
-                    }),
-                    axios.get(`${API}/tables`, { headers }),
-                ]);
+        try {
+            const [foodResponse, tableResponse] = await Promise.all([
+                axios.get(`${API}/menu/foods?isAvailable=true`, {
+                    headers,
+                }),
+                axios.get(`${API}/tables`, {
+                    headers,
+                }),
+            ]);
 
-                setFoods(foodResponse.data.foodItems || []);
+            setFoods(foodResponse.data.foodItems || []);
 
-                setTables(
-                    Array.isArray(tableResponse.data)
-                        ? tableResponse.data
-                        : tableResponse.data.tables ||
-                        tableResponse.data.data ||
-                        []
-                );
-            } catch (err) {
-                setError(
-                    err.response?.data?.message ||
+            setTables(
+                Array.isArray(tableResponse.data)
+                    ? tableResponse.data
+                    : tableResponse.data.tables ||
+                      tableResponse.data.data ||
+                      []
+            );
+        } catch (err) {
+            setError(
+                err.response?.data?.message ||
                     "Unable to load menu or tables. Check your backend and API routes."
-                );
-            } finally {
-                setLoading(false);
-            }
-        };
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         loadData();
-    }, [headers]);
+        // Initial data load for this page.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const categories = [
         "All",
@@ -99,13 +134,14 @@ export default function CreateOrder() {
 
     const getPrice = (food) =>
         Number(food.discountPrice) > 0 &&
-            Number(food.discountPrice) < Number(food.price)
+        Number(food.discountPrice) < Number(food.price)
             ? Number(food.discountPrice)
             : Number(food.price || 0);
 
     const addToCart = (food) => {
         setSuccess("");
         setCreatedOrderNumber("");
+        setCreatedAt("");
         setError("");
 
         setCart((current) => {
@@ -116,7 +152,10 @@ export default function CreateOrder() {
             if (existing) {
                 return current.map((item) =>
                     item.food === food._id
-                        ? { ...item, quantity: item.quantity + 1 }
+                        ? {
+                              ...item,
+                              quantity: item.quantity + 1,
+                          }
                         : item
                 );
             }
@@ -141,9 +180,9 @@ export default function CreateOrder() {
                 .map((item) =>
                     item.food === foodId
                         ? {
-                            ...item,
-                            quantity: item.quantity + amount,
-                        }
+                              ...item,
+                              quantity: item.quantity + amount,
+                          }
                         : item
                 )
                 .filter((item) => item.quantity > 0)
@@ -159,15 +198,16 @@ export default function CreateOrder() {
             )
         );
     };
+
     const updateServingType = (foodId, value) => {
-    setCart((current) =>
-        current.map((item) =>
-            item.food === foodId
-                ? { ...item, servingType: value }
-                : item
-        )
-    );
-};
+        setCart((current) =>
+            current.map((item) =>
+                item.food === foodId
+                    ? { ...item, servingType: value }
+                    : item
+            )
+        );
+    };
 
     const subtotal = cart.reduce(
         (sum, item) => sum + item.price * item.quantity,
@@ -179,9 +219,21 @@ export default function CreateOrder() {
 
     const placeOrder = async (event) => {
         event.preventDefault();
+
         setError("");
         setSuccess("");
         setCreatedOrderNumber("");
+        setCreatedAt("");
+
+        if (!customerName.trim()) {
+            setError("Please enter the customer name.");
+            return;
+        }
+
+        if (!customerMobile.trim()) {
+            setError("Please enter the customer mobile number.");
+            return;
+        }
 
         if (!tableId) {
             setError("Please select a table.");
@@ -201,20 +253,24 @@ export default function CreateOrder() {
         setSubmitting(true);
 
         try {
+            const payload = {
+                customerName: customerName.trim(),
+                customerMobile: customerMobile.trim(),
+                table: tableId,
+                orderType: "dine-in",
+                paymentMethod: "pending",
+                notes: notes.trim(),
+                items: cart.map((item) => ({
+                    food: item.food,
+                    quantity: item.quantity,
+                    specialInstructions: item.specialInstructions,
+                    servingType: item.servingType || "dine-in",
+                })),
+            };
+
             const response = await axios.post(
                 `${API}/restaurant-orders`,
-                {
-                    table: tableId,
-                    orderType: "dine-in",
-                    paymentMethod: "pending",
-                    notes,
-                    items: cart.map((item) => ({
-    food: item.food,
-    quantity: item.quantity,
-    specialInstructions: item.specialInstructions,
-    servingType: item.servingType || "dine-in",
-})),
-                },
+                payload,
                 { headers }
             );
 
@@ -223,22 +279,31 @@ export default function CreateOrder() {
                 response.data.restaurantOrder ||
                 response.data.data;
 
-            const orderNumber =
-                order?.orderNumber ||
-                order?.order?.orderNumber ||
-                "";
-
             setSuccess("Order created successfully!");
             setCreatedOrderNumber(
-                orderNumber ||
-                (order?._id ? order._id : "Order created")
+                order?.orderNumber || order?._id || "Order created"
             );
 
+            if (order?.createdAt) {
+                setCreatedAt(
+                    new Date(order.createdAt).toLocaleString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                    })
+                );
+            }
+
             setCart([]);
+            setCustomerName("");
+            setCustomerMobile("");
             setTableId("");
             setNotes("");
 
-            // Refresh table status after order creation.
+            // Refresh tables after the order is created.
             try {
                 const tableResponse = await axios.get(`${API}/tables`, {
                     headers,
@@ -248,16 +313,16 @@ export default function CreateOrder() {
                     Array.isArray(tableResponse.data)
                         ? tableResponse.data
                         : tableResponse.data.tables ||
-                        tableResponse.data.data ||
-                        []
+                          tableResponse.data.data ||
+                          []
                 );
-            } catch {
-                // The order is already created; don't show a false order failure.
+            } catch (refreshError) {
+                console.error("Unable to refresh tables:", refreshError);
             }
         } catch (err) {
             setError(
                 err.response?.data?.message ||
-                "Unable to create order. Please check your API and try again."
+                    "Unable to create order. Please check your API and try again."
             );
         } finally {
             setSubmitting(false);
@@ -279,7 +344,7 @@ export default function CreateOrder() {
                     Create Restaurant Order
                 </h1>
                 <p className="mt-1 text-slate-500">
-                    Select a table, add food items, and send the order to the kitchen.
+                    Enter customer details, select a table, and add food items.
                 </p>
             </div>
 
@@ -304,6 +369,13 @@ export default function CreateOrder() {
                             {createdOrderNumber}
                         </span>
                     </p>
+
+                    {createdAt && (
+                        <p className="mt-1">
+                            Created At:{" "}
+                            <span className="font-medium">{createdAt}</span>
+                        </p>
+                    )}
                 </div>
             )}
 
@@ -312,14 +384,14 @@ export default function CreateOrder() {
                     <div className="flex flex-col gap-3 sm:flex-row">
                         <input
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            onChange={(event) => setSearch(event.target.value)}
                             placeholder="Search food..."
                             className="w-full rounded-lg border bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
                         />
 
                         <select
                             value={category}
-                            onChange={(e) => setCategory(e.target.value)}
+                            onChange={(event) => setCategory(event.target.value)}
                             className="rounded-lg border bg-white px-4 py-3"
                         >
                             {categories.map((item) => (
@@ -341,14 +413,21 @@ export default function CreateOrder() {
                                     key={food._id}
                                     className="flex flex-col overflow-hidden rounded-xl border bg-white shadow-sm"
                                 >
-                                    {/* Fixed-size menu image */}
                                     <div className="h-40 w-full shrink-0 overflow-hidden bg-slate-100">
-                                        {food.image ? (
+                                        {getImageUrl(food.image) ? (
                                             <img
-                                                src={food.image}
+                                                src={getImageUrl(food.image)}
                                                 alt={food.name}
                                                 loading="lazy"
                                                 className="h-full w-full object-cover"
+                                                onError={(event) => {
+                                                    console.error(
+                                                        "Food image failed:",
+                                                        getImageUrl(food.image)
+                                                    );
+                                                    event.currentTarget.style.display =
+                                                        "none";
+                                                }}
                                             />
                                         ) : (
                                             <div className="flex h-full w-full items-center justify-center text-5xl">
@@ -409,6 +488,48 @@ export default function CreateOrder() {
                         </span>
                     </div>
 
+                    {/* Customer details */}
+                    <div className="space-y-4 rounded-lg bg-slate-50 p-4">
+                        <h3 className="font-semibold text-slate-800">
+                            Customer Details
+                        </h3>
+
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">
+                                Customer Name *
+                            </label>
+                            <input
+                                type="text"
+                                value={customerName}
+                                onChange={(event) =>
+                                    setCustomerName(event.target.value)
+                                }
+                                placeholder="Enter customer name"
+                                required
+                                maxLength={100}
+                                className="w-full rounded-lg border bg-white px-3 py-3"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-700">
+                                Customer Mobile Number *
+                            </label>
+                            <input
+                                type="tel"
+                                value={customerMobile}
+                                onChange={(event) =>
+                                    setCustomerMobile(event.target.value)
+                                }
+                                placeholder="Enter mobile number"
+                                required
+                                maxLength={20}
+                                className="w-full rounded-lg border bg-white px-3 py-3"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Table selection */}
                     <div>
                         <label className="mb-2 block text-sm font-medium text-slate-700">
                             Select Table *
@@ -417,7 +538,7 @@ export default function CreateOrder() {
                         <select
                             required
                             value={tableId}
-                            onChange={(e) => setTableId(e.target.value)}
+                            onChange={(event) => setTableId(event.target.value)}
                             className="w-full rounded-lg border px-3 py-3"
                         >
                             <option value="">Choose available table</option>
@@ -436,12 +557,13 @@ export default function CreateOrder() {
 
                         {availableTables.length === 0 && (
                             <p className="mt-2 text-sm text-amber-700">
-                                No available tables. Check the table status or refresh the page.
+                                No available tables. Check table status or refresh the page.
                             </p>
                         )}
                     </div>
 
-                    <div className="max-h-80 space-y-4 overflow-y-auto">
+                    {/* Cart items */}
+                    <div className="max-h-96 space-y-4 overflow-y-auto">
                         {cart.length === 0 ? (
                             <p className="rounded-lg bg-slate-50 p-5 text-center text-sm text-slate-500">
                                 Your cart is empty. Add food from the menu.
@@ -467,8 +589,8 @@ export default function CreateOrder() {
                                             onClick={() =>
                                                 setCart((current) =>
                                                     current.filter(
-                                                        (x) =>
-                                                            x.food !== item.food
+                                                        (entry) =>
+                                                            entry.food !== item.food
                                                     )
                                                 )
                                             }
@@ -483,10 +605,7 @@ export default function CreateOrder() {
                                             <button
                                                 type="button"
                                                 onClick={() =>
-                                                    changeQuantity(
-                                                        item.food,
-                                                        -1
-                                                    )
+                                                    changeQuantity(item.food, -1)
                                                 }
                                                 className="h-8 w-8 rounded border"
                                             >
@@ -498,10 +617,7 @@ export default function CreateOrder() {
                                             <button
                                                 type="button"
                                                 onClick={() =>
-                                                    changeQuantity(
-                                                        item.food,
-                                                        1
-                                                    )
+                                                    changeQuantity(item.food, 1)
                                                 }
                                                 className="h-8 w-8 rounded border"
                                             >
@@ -510,59 +626,68 @@ export default function CreateOrder() {
                                         </div>
 
                                         <span className="font-semibold">
-                                            ₹
-                                            {(
+                                            ₹{(
                                                 item.price * item.quantity
                                             ).toFixed(2)}
                                         </span>
                                     </div>
 
-                                    <input
-                                        value={item.specialInstructions}
-                                        onChange={(e) =>
-                                            updateInstructions(
-                                                item.food,
-                                                e.target.value
-                                            )
-                                        }
-                                        placeholder="Special instructions (optional)"
-                                        className="mt-3 w-full rounded-lg border px-3 py-2 text-sm"
-                                    />
                                     <div className="mt-3">
-    <label className="mb-1 block text-sm font-medium text-slate-700">
-        Serving Type
-    </label>
+                                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                                            Serving Type
+                                        </label>
+                                        <select
+                                            value={item.servingType}
+                                            onChange={(event) =>
+                                                updateServingType(
+                                                    item.food,
+                                                    event.target.value
+                                                )
+                                            }
+                                            className="w-full rounded-lg border px-3 py-2 text-sm"
+                                        >
+                                            <option value="dine-in">Dine-in</option>
+                                            <option value="takeaway">Takeaway</option>
+                                        </select>
+                                    </div>
 
-    <select
-        value={item.servingType || "dine-in"}
-        onChange={(e) =>
-            updateServingType(item.food, e.target.value)
-        }
-        className="w-full rounded-lg border px-3 py-2 text-sm"
-    >
-        <option value="dine-in">Dine-in</option>
-        <option value="takeaway">Packed / Takeaway</option>
-    </select>
-</div>
+                                    <div className="mt-3">
+                                        <label className="mb-1 block text-xs font-medium text-slate-600">
+                                            Special Instructions
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={item.specialInstructions}
+                                            onChange={(event) =>
+                                                updateInstructions(
+                                                    item.food,
+                                                    event.target.value
+                                                )
+                                            }
+                                            placeholder="e.g. less spicy, no onion"
+                                            className="w-full rounded-lg border px-3 py-2 text-sm"
+                                        />
+                                    </div>
                                 </div>
                             ))
                         )}
                     </div>
 
+                    {/* Order notes */}
                     <div>
                         <label className="mb-2 block text-sm font-medium text-slate-700">
                             Order Notes
                         </label>
-
                         <textarea
                             value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
+                            onChange={(event) => setNotes(event.target.value)}
                             rows={2}
-                            placeholder="Any notes for the kitchen..."
-                            className="w-full rounded-lg border px-3 py-2"
+                            placeholder="Additional notes..."
+                            className="w-full rounded-lg border px-3 py-3"
                         />
                     </div>
 
+                    {/* Bill summary */}
                     <div className="space-y-2 border-t pt-4 text-sm">
                         <div className="flex justify-between">
                             <span className="text-slate-600">Subtotal</span>
@@ -578,23 +703,23 @@ export default function CreateOrder() {
                             <span>Total</span>
                             <span>₹{total.toFixed(2)}</span>
                         </div>
-
-                        <p className="text-xs text-slate-500">
-                            Preview only. The backend calculates the final amount.
-                            Payment will be handled separately.
-                        </p>
                     </div>
 
                     <button
                         type="submit"
-                        disabled={submitting || cart.length === 0 || !tableId}
-                        className="w-full rounded-lg bg-green-600 px-4 py-3 font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={
+                            submitting ||
+                            cart.length === 0 ||
+                            !tableId ||
+                            !customerName.trim() ||
+                            !customerMobile.trim()
+                        }
+                        className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        {submitting ? "Placing Order..." : "Place Order"}
+                        {submitting ? "Creating Order..." : "Create Order"}
                     </button>
                 </form>
             </div>
         </div>
     );
 }
-
