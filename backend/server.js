@@ -27,12 +27,17 @@ const cookieParser = require("cookie-parser");
 const http = require("http");
 const path = require("path");
 
+const restaurantBillMessagingRoutes =
+    require("./routes/restaurantBillMessagingRoutes");
+
+
 const authRoutes = require("./routes/authRoutes");
 const roomRoutes = require("./routes/roomRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const menuRoutes = require("./routes/menuRoutes");
 const tableRoutes = require("./routes/tableRoutes");
+const couponRoutes = require("./routes/couponRoutes");
 
 const restaurantOrderRoutes = require(
     "./routes/restaurantOrderRoutes"
@@ -100,6 +105,8 @@ app.use("/api/auth", authRoutes);
 
 app.use("/api/rooms", roomRoutes);
 
+app.use("/api/coupons", couponRoutes);
+
 app.use("/api/bookings", bookingRoutes);
 
 app.use("/api/payments", paymentRoutes);
@@ -126,7 +133,10 @@ app.use("/api/admin", adminRoutes);
 // =====================================================
 // HEALTH CHECK
 // =====================================================
-
+app.use(
+    "/api/restaurant-bills",
+    restaurantBillMessagingRoutes
+);
 app.get("/", (req, res) => {
     res.status(200).json({
         success: true,

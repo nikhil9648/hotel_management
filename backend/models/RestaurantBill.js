@@ -33,6 +33,18 @@ const restaurantBillSchema = new mongoose.Schema(
             trim: true,
         },
 
+        couponCode: {
+            type: String,
+            default: "",
+            trim: true,
+            uppercase: true,
+        },
+        discountAmount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+
         subtotal: {
             type: Number,
             required: true,
