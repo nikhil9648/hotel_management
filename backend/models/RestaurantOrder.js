@@ -179,6 +179,31 @@ const restaurantOrderSchema = new mongoose.Schema(
             default: "pending",
         },
 
+        razorpayOrderId: {
+  type: String,
+  default: null,
+},
+
+razorpayPaymentId: {
+  type: String,
+  default: null,
+},
+
+paymentVerifiedAt: {
+  type: Date,
+  default: null,
+},
+
+invoiceNumber: {
+  type: String,
+  default: null,
+},
+
+invoiceEmailSentAt: {
+  type: Date,
+  default: null,
+},
+
         // NOTES
         notes: {
             type: String,

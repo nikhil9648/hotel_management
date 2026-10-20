@@ -491,8 +491,10 @@ const getMyRestaurantOrders = async (req, res) => {
         if (["customer", "user"].includes(role)) {
             filter.customer = req.user._id;
         } else if (role === "waiter") {
-            filter.waiter = req.user._id;
-        } else if (
+    filter.waiter = req.user._id;
+    filter.orderType = { $ne: "delivery" };
+}
+        else if (
             !["admin", "manager", "kitchen", "accountant"].includes(role)
         ) {
             return sendError(

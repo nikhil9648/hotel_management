@@ -4,6 +4,7 @@ const {
     registerUser,
     loginUser,
     getMe,
+    updateMyAddress,
 } = require("../controllers/authController");
 
 const {
@@ -19,7 +20,7 @@ const router = express.Router();
 router.post("/register", registerUser);
 
 router.post("/login", loginUser);
-
+router.put("/address", protect, updateMyAddress);
 // ========================================
 // Protected Routes
 // ========================================

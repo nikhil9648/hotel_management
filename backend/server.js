@@ -38,6 +38,9 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const menuRoutes = require("./routes/menuRoutes");
 const tableRoutes = require("./routes/tableRoutes");
 const couponRoutes = require("./routes/couponRoutes");
+const restaurantPaymentRoutes = require("./routes/restaurantPaymentRoutes");
+
+
 
 const restaurantOrderRoutes = require(
     "./routes/restaurantOrderRoutes"
@@ -126,7 +129,7 @@ app.use(
     "/api/restaurant-bills",
     restaurantBillRoutes
 );
-
+app.use("/api/restaurant-payments", restaurantPaymentRoutes);
 // ADMIN ROUTES
 app.use("/api/admin", adminRoutes);
 

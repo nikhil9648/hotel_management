@@ -293,6 +293,70 @@ const getMe = async (req, res) => {
     }
 };
 
+
+
+const updateMyAddress = async (req, res) => {
+  try {
+    const { street, city, state, pincode, country } = req.body || {};
+
+    if (
+      typeof street !== "string" ||
+      typeof city !== "string" ||
+      typeof state !== "string" ||
+      typeof pincode !== "string" ||
+      !street.trim() ||
+      !city.trim() ||
+      !state.trim() ||
+      !pincode.trim()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Street, city, state and pincode are required.",
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    user.set("address", {
+      street: street.trim(),
+      city: city.trim(),
+      state: state.trim(),
+      pincode: pincode.trim(),
+      country:
+        typeof country === "string" && country.trim()
+          ? country.trim()
+          : "India",
+    });
+
+    // Update only address to avoid validating unrelated legacy fields.
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { address: user.address } },
+      { runValidators: false }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Delivery address saved successfully.",
+      address: user.address,
+    });
+  } catch (error) {
+    console.error("Update address error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to save delivery address.",
+    });
+  }
+};
+
 // ========================================
 // Logout User
 // ========================================
@@ -323,4 +387,5 @@ module.exports = {
     loginUser,
     getMe,
     logoutUser,
+    updateMyAddress,
 };

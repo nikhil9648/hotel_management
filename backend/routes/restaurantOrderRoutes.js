@@ -29,7 +29,7 @@ const {
 router.post(
     "/",
     protect,
-    authorize("waiter", "admin", "manager"),
+    authorize("customer", "waiter", "admin", "manager"),
     createRestaurantOrder
 );
 

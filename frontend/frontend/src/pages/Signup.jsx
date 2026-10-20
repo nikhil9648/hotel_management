@@ -9,6 +9,7 @@ function Signup() {
 
     const [formData, setFormData] = useState({
         name: "",
+        phone: "",
         email: "",
         password: "",
         confirmPassword: "",
@@ -18,23 +19,48 @@ function Signup() {
     const [loading, setLoading] = useState(false);
 
     const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
-        });
+        const { name, value } = e.target;
+
+        setFormData((previous) => ({
+            ...previous,
+            [name]:
+                name === "phone"
+                    ? value.replace(/\D/g, "").slice(0, 10)
+                    : value,
+        }));
+
+        setError("");
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
 
-        if (formData.password !== formData.confirmPassword) {
-            setError("Passwords do not match.");
+        const name = formData.name.trim();
+        const email = formData.email.trim().toLowerCase();
+        const phone = formData.phone.trim();
+
+        if (!name || !email || !phone || !formData.password) {
+            setError("Please fill in all required fields.");
+            return;
+        }
+
+        if (!/^[6-9]\d{9}$/.test(phone)) {
+            setError(
+                "Enter a valid 10-digit Indian mobile number."
+            );
             return;
         }
 
         if (formData.password.length < 6) {
-            setError("Password must contain at least 6 characters.");
+            setError(
+                "Password must contain at least 6 characters."
+            );
+            return;
+        }
+
+        if (formData.password !== formData.confirmPassword) {
+            setError("Passwords do not match.");
             return;
         }
 
@@ -44,27 +70,42 @@ function Signup() {
             const response = await axios.post(
                 "http://localhost:5000/api/customer-auth/register",
                 {
-                    name: formData.name.trim(),
-                    email: formData.email.trim(),
+                    name,
+                    email,
+                    phone,
                     password: formData.password,
-                    // role: "customer",
                 }
             );
 
-            if (response.status === 200 || response.status === 201) {
+            if (
+                response.status === 200 ||
+                response.status === 201
+            ) {
                 navigate("/login", {
                     replace: true,
                     state: {
-                        message: "Account created successfully. Please log in.",
+                        message:
+                            "Account created successfully. Please log in.",
                     },
                 });
             }
         } catch (err) {
-            setError(
+            const status = err.response?.status;
+            const backendMessage =
                 err.response?.data?.message ||
-                err.response?.data?.error ||
-                "Unable to create account. Please try again."
-            );
+                err.response?.data?.error;
+
+            if (status === 409) {
+                setError(
+                    backendMessage ||
+                    "This email or mobile number is already registered."
+                );
+            } else {
+                setError(
+                    backendMessage ||
+                    "Unable to create account. Please try again."
+                );
+            }
         } finally {
             setLoading(false);
         }
@@ -78,6 +119,7 @@ function Signup() {
                 </Link>
 
                 <h1>Create your account</h1>
+
                 <p className="signup-subtitle">
                     Sign up to book rooms and order your favourite food.
                 </p>
@@ -89,7 +131,7 @@ function Signup() {
                 )}
 
                 <form onSubmit={handleSubmit}>
-                    <label htmlFor="name">Full name</label>
+                    <label htmlFor="name">Full name *</label>
                     <input
                         id="name"
                         type="text"
@@ -98,10 +140,29 @@ function Signup() {
                         value={formData.name}
                         onChange={handleChange}
                         autoComplete="name"
+                        minLength={2}
+                        maxLength={100}
                         required
                     />
 
-                    <label htmlFor="email">Email address</label>
+                    <label htmlFor="phone">Mobile number *</label>
+                    <input
+                        id="phone"
+                        type="tel"
+                        name="phone"
+                        placeholder="Enter 10-digit mobile number"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        pattern="[6-9][0-9]{9}"
+                        maxLength={10}
+                        minLength={10}
+                        inputMode="numeric"
+                        autoComplete="tel-national"
+                        title="Enter a valid 10-digit Indian mobile number"
+                        required
+                    />
+
+                    <label htmlFor="email">Email address *</label>
                     <input
                         id="email"
                         type="email"
@@ -110,10 +171,11 @@ function Signup() {
                         value={formData.email}
                         onChange={handleChange}
                         autoComplete="email"
+                        maxLength={254}
                         required
                     />
 
-                    <label htmlFor="password">Password</label>
+                    <label htmlFor="password">Password *</label>
                     <input
                         id="password"
                         type="password"
@@ -127,7 +189,7 @@ function Signup() {
                     />
 
                     <label htmlFor="confirmPassword">
-                        Confirm password
+                        Confirm password *
                     </label>
                     <input
                         id="confirmPassword"
@@ -137,11 +199,14 @@ function Signup() {
                         value={formData.confirmPassword}
                         onChange={handleChange}
                         autoComplete="new-password"
+                        minLength={6}
                         required
                     />
 
                     <button type="submit" disabled={loading}>
-                        {loading ? "Creating account..." : "Create Account"}
+                        {loading
+                            ? "Creating account..."
+                            : "Create Account"}
                     </button>
                 </form>
 
