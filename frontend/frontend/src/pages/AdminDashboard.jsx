@@ -1,9 +1,9 @@
-
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 
 const API_URL = "http://localhost:5000/api/admin";
+const API = "http://localhost:5000/api";
 
 const initialStats = {
     totalUsers: 0,
@@ -111,6 +111,11 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
+    // Online orders state
+    const [onlineOrders, setOnlineOrders] = useState([]);
+    const [onlineOrdersLoading, setOnlineOrdersLoading] = useState(true);
+    const [onlineOrdersError, setOnlineOrdersError] = useState("");
+
     const fetchDashboard = async () => {
         setLoading(true);
         setError("");
@@ -153,9 +158,71 @@ export default function AdminDashboard() {
         }
     };
 
+    // Fetch only customer delivery orders
+    const fetchOnlineOrders = useCallback(async () => {
+        try {
+            const token =
+                localStorage.getItem("token") ||
+                localStorage.getItem("accessToken");
+
+            if (!token) {
+                throw new Error("Please log in again.");
+            }
+
+            const response = await axios.get(
+                `${API}/restaurant-orders/all`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            const data = response.data;
+
+            const orders = Array.isArray(data)
+                ? data
+                : data.orders || data.data || [];
+
+            const filteredOrders = orders
+                .filter(
+                    (order) =>
+                        order.orderType === "delivery" &&
+                        order.orderStatus !== "cancelled" &&
+                        order.billGenerated !== true
+                )
+                .sort(
+                    (a, b) =>
+                        new Date(b.createdAt || 0) -
+                        new Date(a.createdAt || 0)
+                );
+
+            setOnlineOrders(filteredOrders);
+            setOnlineOrdersError("");
+        } catch (err) {
+            setOnlineOrdersError(
+                err.response?.data?.message ||
+                err.message ||
+                "Unable to load online orders."
+            );
+        } finally {
+            setOnlineOrdersLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         fetchDashboard();
     }, []);
+
+    useEffect(() => {
+        fetchOnlineOrders();
+
+        const interval = setInterval(() => {
+            fetchOnlineOrders();
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [fetchOnlineOrders]);
 
     const displayValue = (value) =>
         loading ? "—" : (value ?? 0);
@@ -174,7 +241,10 @@ export default function AdminDashboard() {
                 </div>
 
                 <button
-                    onClick={fetchDashboard}
+                    onClick={() => {
+                        fetchDashboard();
+                        fetchOnlineOrders();
+                    }}
                     disabled={loading}
                     className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
                 >
@@ -284,6 +354,170 @@ export default function AdminDashboard() {
                 </section>
             ))}
 
+            {/* ONLINE ORDERS */}
+            <section className="overflow-hidden rounded-xl border border-purple-200 bg-white shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b p-5">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-lg font-bold text-slate-800">
+                                Online Orders
+                            </h2>
+
+                            <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-800">
+                                {onlineOrders.length}
+                            </span>
+                        </div>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                            Customer delivery orders from the website.
+                        </p>
+                    </div>
+
+                    <button
+                        onClick={fetchOnlineOrders}
+                        disabled={onlineOrdersLoading}
+                        className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+                    >
+                        {onlineOrdersLoading
+                            ? "Loading..."
+                            : "Refresh Orders"}
+                    </button>
+                </div>
+
+                {onlineOrdersError && (
+                    <div className="m-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                        {onlineOrdersError}
+                    </div>
+                )}
+
+                {onlineOrdersLoading ? (
+                    <p className="p-5 text-slate-500">
+                        Loading online orders...
+                    </p>
+                ) : onlineOrders.length === 0 ? (
+                    <div className="p-8 text-center">
+                        <p className="font-medium text-slate-700">
+                            No active online orders
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                            New customer delivery orders will appear here.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-4 p-5 xl:grid-cols-2">
+                        {onlineOrders.map((order) => (
+                            <article
+                                key={order._id}
+                                className="rounded-xl border border-purple-100 bg-purple-50/40 p-4"
+                            >
+                                {/* Order header */}
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-800">
+                                            ONLINE
+                                        </span>
+
+                                        <h3 className="mt-3 font-bold text-slate-800">
+                                            Order #{
+                                                order.orderNumber ||
+                                                String(order._id)
+                                                    .slice(-6)
+                                                    .toUpperCase()
+                                            }
+                                        </h3>
+
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            {order.createdAt
+                                                ? new Date(
+                                                    order.createdAt
+                                                ).toLocaleString()
+                                                : "Time unavailable"}
+                                        </p>
+                                    </div>
+
+                                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold capitalize text-slate-700 ring-1 ring-slate-200">
+                                        {(
+                                            order.orderStatus || "pending"
+                                        ).replaceAll("_", " ")}
+                                    </span>
+                                </div>
+
+                                {/* Customer details */}
+                                <div className="mt-4 space-y-1 text-sm text-slate-700">
+                                    <p>
+                                        <strong>Customer:</strong>{" "}
+                                        {order.customerName ||
+                                            order.customer?.name ||
+                                            "Customer"}
+                                    </p>
+
+                                    <p>
+                                        <strong>Mobile:</strong>{" "}
+                                        {order.customerMobile ||
+                                            "Not available"}
+                                    </p>
+
+                                    <p>
+                                        <strong>Address:</strong>{" "}
+                                        {typeof order.deliveryAddress === "string"
+                                            ? order.deliveryAddress ||
+                                              "Not available"
+                                            : order.deliveryAddress?.address ||
+                                              order.deliveryAddress?.formattedAddress ||
+                                              "Not available"}
+                                    </p>
+                                </div>
+
+                                {/* Ordered items */}
+                                <div className="mt-4 border-t border-purple-100 pt-3">
+                                    <h4 className="mb-2 text-sm font-semibold text-slate-800">
+                                        Ordered Items
+                                    </h4>
+
+                                    <div className="space-y-2">
+                                        {(order.items || []).map(
+                                            (item, index) => (
+                                                <div
+                                                    key={item._id || index}
+                                                    className="flex justify-between gap-3 text-sm"
+                                                >
+                                                    <span className="text-slate-700">
+                                                        {item.name ||
+                                                            item.food?.name ||
+                                                            "Food item"}
+                                                        {" "}×{" "}
+                                                        {item.quantity || 1}
+                                                    </span>
+
+                                                    <span className="whitespace-nowrap font-medium text-slate-800">
+                                                        {formatCurrency(
+                                                            item.total ??
+                                                            Number(item.price || 0) *
+                                                            Number(item.quantity || 1)
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+
+                                    {/* Total */}
+                                    <div className="mt-3 flex justify-between border-t border-purple-100 pt-3">
+                                        <span className="font-semibold text-slate-700">
+                                            Order Total
+                                        </span>
+
+                                        <span className="font-bold text-slate-900">
+                                            {formatCurrency(order.totalAmount)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </article>
+                        ))}
+                    </div>
+                )}
+            </section>
+
             {/* RECENT BOOKINGS */}
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b p-5">
@@ -305,7 +539,9 @@ export default function AdminDashboard() {
                 </div>
 
                 {loading ? (
-                    <p className="p-5 text-slate-500">Loading bookings...</p>
+                    <p className="p-5 text-slate-500">
+                        Loading bookings...
+                    </p>
                 ) : stats.recentBookings.length === 0 ? (
                     <p className="p-5 text-slate-500">
                         No bookings found.
@@ -338,7 +574,9 @@ export default function AdminDashboard() {
                                             {booking.room?.roomNumber || "—"}
                                         </td>
                                         <td className="p-4 whitespace-nowrap">
-                                            {formatCurrency(booking.totalAmount)}
+                                            {formatCurrency(
+                                                booking.totalAmount
+                                            )}
                                         </td>
                                         <td className="p-4">
                                             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs capitalize">
@@ -366,7 +604,9 @@ export default function AdminDashboard() {
                 </div>
 
                 {loading ? (
-                    <p className="p-5 text-slate-500">Loading orders...</p>
+                    <p className="p-5 text-slate-500">
+                        Loading orders...
+                    </p>
                 ) : stats.recentOrders.length === 0 ? (
                     <p className="p-5 text-slate-500">
                         No restaurant orders found.
@@ -392,7 +632,9 @@ export default function AdminDashboard() {
                                             {order.orderNumber || "—"}
                                         </td>
                                         <td className="p-4">
-                                            {order.customer?.name || "Walk-in Customer"}
+                                            {order.customerName ||
+                                                order.customer?.name ||
+                                                "Walk-in Customer"}
                                         </td>
                                         <td className="p-4 capitalize">
                                             {order.orderType || "—"}
@@ -451,3 +693,4 @@ export default function AdminDashboard() {
         </div>
     );
 }
+

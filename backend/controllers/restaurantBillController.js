@@ -169,12 +169,19 @@ const createRestaurantBill = async (req, res) => {
         });
 
         if (existingBill) {
-            return res.status(200).json({
-                success: true,
-                message: "An open bill already exists for this table.",
-                bill: existingBill,
-            });
-        }
+    // Orders already included in this bill should not remain
+    // in the kitchen queue.
+    await RestaurantOrder.updateMany(
+        { _id: { $in: existingBill.orders } },
+        { $set: { billGenerated: true } }
+    );
+
+    return res.status(200).json({
+        success: true,
+        message: "An open bill already exists for this table.",
+        bill: existingBill,
+    });
+}
 
         // Calculate subtotal from the actual orders.
         const selectedOrderIds = orders.map((order) => order._id);
@@ -279,6 +286,13 @@ customerPhone: finalCustomerPhone,
             status: "open",
             paidAt: null,
         });
+
+        // Hide billed orders from the kitchen queue immediately.
+// Payment is not required for this change.
+await RestaurantOrder.updateMany(
+    { _id: { $in: selectedOrderIds } },
+    { $set: { billGenerated: true } }
+);
 
         const populatedBill = await RestaurantBill.findById(bill._id)
             .populate("table", "tableNumber capacity status")
@@ -387,13 +401,6 @@ const payRestaurantBill = async (req, res) => {
         bill.paidAmount = bill.totalAmount;
         bill.status = "paid";
         bill.paidAt = new Date();
-console.log("PAYMENT FUNCTION CALLED:", bill._id);
-        await bill.save();
-console.log("PAYMENT SAVED:", bill.paymentStatus);
-console.log("CUSTOMER PHONE:", bill.customerPhone);
-console.log("TWILIO SID:", process.env.TWILIO_ACCOUNT_SID ? "FOUND" : "MISSING");
-console.log("SMS SENDER:", process.env.TWILIO_SMS_FROM ? "FOUND" : "MISSING");
-console.log("WHATSAPP SENDER:", process.env.TWILIO_WHATSAPP_FROM ? "FOUND" : "MISSING");
         // Update restaurant orders.
         await RestaurantOrder.updateMany(
             { _id: { $in: bill.orders } },

@@ -60,6 +60,7 @@ const getAdminDashboard = async (req, res) => {
             "kitchen",
             "accountant",
             "hr",
+            "delivery_boy",
         ];
 
         const [
@@ -270,6 +271,8 @@ const createStaff = async (req, res) => {
             "kitchen",
             "accountant",
             "hr",
+            "delivery_boy",
+        
         ];
 
         if (!allowedRoles.includes(role)) {

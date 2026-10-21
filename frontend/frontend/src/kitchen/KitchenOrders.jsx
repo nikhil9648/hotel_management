@@ -117,7 +117,7 @@ export default function KitchenOrders() {
                             key={order._id}
                             className="overflow-hidden rounded-xl bg-white shadow"
                         >
-                            <div className="flex items-start justify-between gap-3 bg-slate-900 p-4 text-white">
+                            <div className="flex items-start justify-between gap-3 bg-blue-900 p-4 text-white">
                                 <div>
                                     <h2 className="text-lg font-bold">
                                         Order #{order.orderNumber || order._id.slice(-6)}
@@ -128,7 +128,7 @@ export default function KitchenOrders() {
                                             order.table?.name ||
                                             (order.orderType === "takeaway"
                                                 ? "Takeaway"
-                                                : "N/A")}
+                                                : "Packing")}
                                     </p>
                                 </div>
 

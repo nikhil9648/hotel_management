@@ -8,15 +8,28 @@ const User = require("../models/User");
 const transporter = require("../config/mailer");
 const generateRestaurantInvoice = require("../utils/generateRestaurantInvoice");
 
-// Create Razorpay order for an existing restaurant order
+// =====================================================
+// CREATE RAZORPAY ORDER
+// =====================================================
+
 const createRestaurantPaymentOrder = async (req, res) => {
   try {
-    const { orderId } = req.body;
+    const { orderId } = req.body || {};
 
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    if (!orderId || !mongoose.Types.ObjectId.isValid(orderId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid restaurant order ID",
+      });
+    }
+
+    if (
+      !process.env.RAZORPAY_KEY_ID ||
+      !process.env.RAZORPAY_KEY_SECRET
+    ) {
+      return res.status(500).json({
+        success: false,
+        message: "Razorpay configuration is missing",
       });
     }
 
@@ -49,6 +62,13 @@ const createRestaurantPaymentOrder = async (req, res) => {
       });
     }
 
+    if (["cancelled", "canceled"].includes(order.orderStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment cannot be made for a cancelled order",
+      });
+    }
+
     const amount = Math.round(Number(order.totalAmount) * 100);
 
     if (!Number.isSafeInteger(amount) || amount <= 0) {
@@ -58,16 +78,15 @@ const createRestaurantPaymentOrder = async (req, res) => {
       });
     }
 
-    // Reuse the existing Razorpay order if one was already created.
+    // Reuse the saved Razorpay order when available.
     if (order.razorpayOrderId) {
-      return res.json({
+      return res.status(200).json({
         success: true,
+        message: "Existing Razorpay order retrieved",
         key: process.env.RAZORPAY_KEY_ID,
-        order: {
-          id: order.razorpayOrderId,
-          amount,
-          currency: "INR",
-        },
+        razorpayOrderId: order.razorpayOrderId,
+        amount,
+        currency: "INR",
       });
     }
 
@@ -87,12 +106,11 @@ const createRestaurantPaymentOrder = async (req, res) => {
 
     return res.status(201).json({
       success: true,
+      message: "Razorpay order created successfully",
       key: process.env.RAZORPAY_KEY_ID,
-      order: {
-        id: paymentOrder.id,
-        amount: paymentOrder.amount,
-        currency: paymentOrder.currency,
-      },
+      razorpayOrderId: paymentOrder.id,
+      amount: paymentOrder.amount,
+      currency: paymentOrder.currency,
     });
   } catch (error) {
     console.error("Create restaurant payment error:", error);
@@ -104,7 +122,10 @@ const createRestaurantPaymentOrder = async (req, res) => {
   }
 };
 
-// Verify Razorpay payment and email invoice
+// =====================================================
+// VERIFY RAZORPAY PAYMENT
+// =====================================================
+
 const verifyRestaurantPayment = async (req, res) => {
   try {
     const {
@@ -112,9 +133,10 @@ const verifyRestaurantPayment = async (req, res) => {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-    } = req.body;
+    } = req.body || {};
 
     if (
+      !orderId ||
       !mongoose.Types.ObjectId.isValid(orderId) ||
       !razorpay_order_id ||
       !razorpay_payment_id ||
@@ -122,7 +144,7 @@ const verifyRestaurantPayment = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "Payment verification details are missing",
+        message: "Payment verification details are missing or invalid",
       });
     }
 
@@ -148,11 +170,7 @@ const verifyRestaurantPayment = async (req, res) => {
       });
     }
 
-    // Prevent a different Razorpay order from being used.
-    console.log("Restaurant Order ID:", order._id.toString());
-console.log("Saved Razorpay Order ID:", order.razorpayOrderId);
-console.log("Received Razorpay Order ID:", razorpay_order_id);
-console.log("Received Payment ID:", razorpay_payment_id);
+    // Make sure the payment belongs to this order.
     if (order.razorpayOrderId !== razorpay_order_id) {
       return res.status(400).json({
         success: false,
@@ -160,9 +178,9 @@ console.log("Received Payment ID:", razorpay_payment_id);
       });
     }
 
-    // Handle repeated verification without sending another invoice.
+    // Idempotent response for a previously verified payment.
     if (order.paymentStatus === "paid") {
-      return res.json({
+      return res.status(200).json({
         success: true,
         message: "Payment is already verified",
         orderId: order._id,
@@ -170,6 +188,14 @@ console.log("Received Payment ID:", razorpay_payment_id);
       });
     }
 
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+      return res.status(500).json({
+        success: false,
+        message: "Razorpay secret is not configured",
+      });
+    }
+
+    // Verify Razorpay signature.
     const expectedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -188,7 +214,7 @@ console.log("Received Payment ID:", razorpay_payment_id);
       });
     }
 
-    // Verify payment directly with Razorpay.
+    // Verify payment status and amount directly with Razorpay.
     const payment = await razorpay.payments.fetch(razorpay_payment_id);
 
     const expectedAmount = Math.round(Number(order.totalAmount) * 100);
@@ -201,10 +227,11 @@ console.log("Received Payment ID:", razorpay_payment_id);
     ) {
       return res.status(400).json({
         success: false,
-        message: "Payment is not captured or amount does not match",
+        message: "Payment is not captured or the amount does not match",
       });
     }
 
+    // Save successful payment.
     order.paymentStatus = "paid";
     order.paymentMethod = "razorpay";
     order.razorpayPaymentId = razorpay_payment_id;
@@ -215,61 +242,79 @@ console.log("Received Payment ID:", razorpay_payment_id);
         `INV-${Date.now()}-${order._id.toString().slice(-6).toUpperCase()}`;
     }
 
-    // Change this field if your schema uses a different status field.
     if (order.orderStatus === "pending") {
       order.orderStatus = "confirmed";
     }
 
     await order.save();
 
-    const customer = order.customer
-      ? await User.findById(order.customer).select("name email phone")
-      : null;
+    // Payment is already saved. Email errors must not mark it as unpaid.
+    try {
+      const customer = order.customer
+        ? await User.findById(order.customer).select("name email phone")
+        : null;
 
-    if (!customer?.email) {
-      return res.json({
+      if (!customer?.email) {
+        return res.status(200).json({
+          success: true,
+          message: "Payment verified successfully; customer email not found",
+          orderId: order._id,
+          invoiceNumber: order.invoiceNumber,
+          invoiceEmailSent: false,
+        });
+      }
+
+      if (!order.invoiceEmailSentAt) {
+        const pdfBuffer = await generateRestaurantInvoice(order, customer);
+
+        await transporter.sendMail({
+          from: process.env.SMTP_USER,
+          to: customer.email,
+          subject: `Restaurant Invoice ${order.invoiceNumber}`,
+          text:
+            `Hello ${customer.name || "Customer"},\n\n` +
+            "Your payment was verified successfully. Your invoice is attached.\n\n" +
+            "Thank you for ordering with us.",
+          attachments: [
+            {
+              filename: `${order.invoiceNumber}.pdf`,
+              content: pdfBuffer,
+              contentType: "application/pdf",
+            },
+          ],
+        });
+
+        order.invoiceEmailSentAt = new Date();
+        await order.save();
+      }
+
+      return res.status(200).json({
         success: true,
-        message: "Payment verified, but registered customer email was not found",
+        message: "Payment verified successfully",
         orderId: order._id,
+        invoiceNumber: order.invoiceNumber,
+        invoiceEmailSent: true,
+      });
+    } catch (emailError) {
+      console.error(
+        "Payment succeeded, but invoice email failed:",
+        emailError
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Payment verified successfully, but invoice email could not be sent",
+        orderId: order._id,
+        invoiceNumber: order.invoiceNumber,
+        invoiceEmailSent: false,
       });
     }
-
-    if (!order.invoiceEmailSentAt) {
-      const pdfBuffer = await generateRestaurantInvoice(order, customer);
-
-      await transporter.sendMail({
-        from: process.env.SMTP_USER,
-        to: customer.email,
-        subject: `Restaurant Invoice ${order.invoiceNumber}`,
-        text:
-          `Hello ${customer.name || "Customer"},\n\n` +
-          "Your payment was verified successfully. Your invoice is attached.\n\n" +
-          "Thank you for ordering with us.",
-        attachments: [
-          {
-            filename: `${order.invoiceNumber}.pdf`,
-            content: pdfBuffer,
-            contentType: "application/pdf",
-          },
-        ],
-      });
-
-      order.invoiceEmailSentAt = new Date();
-      await order.save();
-    }
-
-    return res.json({
-      success: true,
-      message: "Payment verified and invoice email sent",
-      orderId: order._id,
-      invoiceNumber: order.invoiceNumber,
-    });
   } catch (error) {
     console.error("Verify restaurant payment error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Payment verification or invoice processing failed",
+      message: "Unable to verify payment. Check the order status before retrying.",
     });
   }
 };

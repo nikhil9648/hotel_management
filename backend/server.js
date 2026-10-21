@@ -39,6 +39,8 @@ const menuRoutes = require("./routes/menuRoutes");
 const tableRoutes = require("./routes/tableRoutes");
 const couponRoutes = require("./routes/couponRoutes");
 const restaurantPaymentRoutes = require("./routes/restaurantPaymentRoutes");
+const deliveryRoutes = require("./routes/deliveryRoutes");
+const deliveryBoyRoutes = require("./routes/deliveryBoyRoutes");
 
 
 
@@ -118,6 +120,8 @@ app.use("/api/menu", menuRoutes);
 
 app.use("/api/tables", tableRoutes);
 
+app.use("/api/delivery-boys", deliveryBoyRoutes);
+
 app.use(
     "/api/restaurant-orders",
     restaurantOrderRoutes
@@ -140,6 +144,7 @@ app.use(
     "/api/restaurant-bills",
     restaurantBillMessagingRoutes
 );
+app.use("/api/delivery", deliveryRoutes);
 app.get("/", (req, res) => {
     res.status(200).json({
         success: true,
@@ -155,6 +160,7 @@ app.get("/api/health", (req, res) => {
         timestamp: new Date().toISOString(),
     });
 });
+
 
 // =====================================================
 // 404

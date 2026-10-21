@@ -19,6 +19,9 @@ const {
     updateRestaurantOrderStatus,
     updateRestaurantOrderPayment,
     removeRestaurantOrderItem,
+    assignDeliveryBoy,
+    getMyDeliveryOrders,
+    verifyDeliveryOtp,
 } = restaurantOrderController;
 
 
@@ -124,7 +127,12 @@ router.put(
     updateRestaurantOrderPayment
 );
 
-
+router.patch(
+    "/:id/assign-delivery",
+    protect,
+    authorize("admin", "manager"),
+    assignDeliveryBoy
+);
 // ========================================
 // GET SINGLE ORDER BY ID
 // ========================================

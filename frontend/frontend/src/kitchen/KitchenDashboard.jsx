@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 
@@ -36,10 +35,11 @@ const statusClass = (status) => {
   return "bg-yellow-100 text-yellow-800";
 };
 
+// Order mode
 const orderTypeLabel = (orderType) => {
-  if (orderType === "delivery") return "Online Delivery";
-  if (orderType === "takeaway") return "Takeaway";
-  return "Dine-in";
+  if (orderType === "delivery") return "ONLINE";
+  if (orderType === "takeaway") return "TAKEAWAY";
+  return "DINE-IN";
 };
 
 export default function KitchenDashboard() {
@@ -56,6 +56,7 @@ export default function KitchenDashboard() {
     if (!token) {
       setError("Please log in to access the kitchen dashboard.");
       setLoading(false);
+      setRefreshing(false);
       return;
     }
 
@@ -76,16 +77,24 @@ export default function KitchenDashboard() {
       );
 
       const data = response.data;
+
       const list = Array.isArray(data)
         ? data
         : data.orders || data.data || [];
 
-      list.sort(
-        (a, b) =>
-          new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
+      // Hide billed orders from the kitchen UI as well.
+      // Backend should also filter billGenerated orders.
+      const kitchenOrders = list.filter(
+        (order) => order.billGenerated !== true
       );
 
-      setOrders(list);
+      kitchenOrders.sort(
+        (a, b) =>
+          new Date(a.createdAt || 0) -
+          new Date(b.createdAt || 0)
+      );
+
+      setOrders(kitchenOrders);
       setError("");
     } catch (err) {
       setError(
@@ -111,10 +120,14 @@ export default function KitchenDashboard() {
   const updateStatus = async (orderId, newStatus) => {
     const token = getToken();
 
+    if (!token) {
+      setError("Please log in again.");
+      return;
+    }
+
     try {
       setUpdatingId(orderId);
 
-      // This endpoint must exist in your backend.
       await axios.patch(
         `${API}/restaurant-orders/${orderId}/status`,
         { status: newStatus },
@@ -183,11 +196,13 @@ export default function KitchenDashboard() {
   return (
     <main className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
+        {/* Header */}
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
               Kitchen Dashboard
             </h1>
+
             <p className="mt-1 text-gray-500">
               Manage preparation and ready-to-serve orders.
             </p>
@@ -202,18 +217,21 @@ export default function KitchenDashboard() {
           </button>
         </div>
 
+        {/* Error */}
         {error && (
           <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
             {error}
           </div>
         )}
 
+        {/* Summary cards */}
         <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatCard title="Active Orders" value={activeCount} />
           <StatCard title="Ready Orders" value={readyCount} />
           <StatCard title="Online Deliveries" value={deliveryCount} />
         </section>
 
+        {/* Filters */}
         <div className="mb-6 flex flex-wrap gap-2">
           {[
             ["active", "Active"],
@@ -236,11 +254,13 @@ export default function KitchenDashboard() {
           ))}
         </div>
 
+        {/* Orders */}
         {visibleOrders.length === 0 ? (
           <div className="rounded-xl bg-white p-10 text-center shadow-sm">
             <h2 className="text-lg font-semibold text-gray-800">
               No orders found
             </h2>
+
             <p className="mt-2 text-gray-500">
               New restaurant and online delivery orders will appear here.
             </p>
@@ -258,14 +278,19 @@ export default function KitchenDashboard() {
                   key={order._id}
                   className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-100"
                 >
+                  {/* Order heading */}
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-bold text-gray-900">
-                        Order #{String(order._id).slice(-6).toUpperCase()}
+                        Order #
+                        {order.orderNumber ||
+                          String(order._id).slice(-6).toUpperCase()}
                       </h2>
 
                       <p className="mt-1 text-sm text-gray-500">
-                        {new Date(order.createdAt || Date.now()).toLocaleString()}
+                        {new Date(
+                          order.createdAt || Date.now()
+                        ).toLocaleString()}
                       </p>
                     </div>
 
@@ -276,6 +301,7 @@ export default function KitchenDashboard() {
                     </span>
                   </div>
 
+                  {/* Mode only: no payment status */}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span
                       className={`rounded-md px-3 py-1 text-sm font-semibold ${
@@ -284,14 +310,11 @@ export default function KitchenDashboard() {
                           : "bg-gray-100 text-gray-800"
                       }`}
                     >
-                      {orderTypeLabel(order.orderType)}
-                    </span>
-
-                    <span className="rounded-md bg-gray-100 px-3 py-1 text-sm capitalize text-gray-700">
-                      Payment: {order.paymentStatus || "unpaid"}
+                      Mode: {orderTypeLabel(order.orderType)}
                     </span>
                   </div>
 
+                  {/* Online delivery details */}
                   {isDelivery && (
                     <div className="mt-4 rounded-lg border border-purple-100 bg-purple-50 p-4">
                       <h3 className="mb-2 font-semibold text-purple-900">
@@ -311,7 +334,7 @@ export default function KitchenDashboard() {
                       <p className="mt-1 text-sm text-gray-700">
                         <strong>Address:</strong>{" "}
                         {typeof order.deliveryAddress === "string"
-                          ? order.deliveryAddress
+                          ? order.deliveryAddress || "Address not available"
                           : order.deliveryAddress?.address ||
                             order.deliveryAddress?.formattedAddress ||
                             "Address not available"}
@@ -319,17 +342,22 @@ export default function KitchenDashboard() {
                     </div>
                   )}
 
+                  {/* Dine-in / takeaway details */}
                   {!isDelivery && (
                     <div className="mt-4 rounded-lg bg-gray-50 p-3 text-sm">
                       <span className="text-gray-500">Table: </span>
+
                       <strong>
                         {typeof table === "object"
-                          ? table?.tableNumber || table?.name || "Not assigned"
+                          ? table?.tableNumber ||
+                            table?.name ||
+                            "Not assigned"
                           : table || order.tableNumber || "Not assigned"}
                       </strong>
                     </div>
                   )}
 
+                  {/* Items */}
                   <h3 className="mb-3 mt-5 font-semibold text-gray-800">
                     Items to Prepare
                   </h3>
@@ -352,6 +380,12 @@ export default function KitchenDashboard() {
                             Quantity: {item.quantity || 1}
                           </p>
 
+                          {item.specialInstructions && (
+                            <p className="mt-1 text-sm text-orange-700">
+                              Note: {item.specialInstructions}
+                            </p>
+                          )}
+
                           {item.notes && (
                             <p className="mt-1 text-sm text-orange-700">
                               Note: {item.notes}
@@ -369,15 +403,18 @@ export default function KitchenDashboard() {
                     ))}
                   </div>
 
+                  {/* Order total */}
                   <div className="mt-4 flex items-center justify-between border-t pt-4">
                     <span className="font-semibold text-gray-700">
                       Order Total
                     </span>
+
                     <span className="text-lg font-bold text-gray-900">
                       {formatMoney(order.totalAmount)}
                     </span>
                   </div>
 
+                  {/* Kitchen actions */}
                   <div className="mt-4 flex flex-wrap gap-2">
                     {["pending", "confirmed"].includes(status) && (
                       <button
@@ -423,3 +460,4 @@ function StatCard({ title, value }) {
     </div>
   );
 }
+

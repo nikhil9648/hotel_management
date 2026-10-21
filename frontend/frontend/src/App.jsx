@@ -5,15 +5,13 @@ import {
     Route,
     Navigate,
     Link,
-    NavLink,
     useLocation,
 } from "react-router-dom";
 
+// Public and Customer Pages
 import Home from "./pages/Home";
 import Signup from "./pages/Signup";
 import Profile from "./pages/Profile";
-
-// Customer Pages
 import Login from "./pages/Login";
 import Rooms from "./pages/Rooms";
 import PaymentSuccess from "./pages/PaymentSuccess";
@@ -35,11 +33,11 @@ import AdminRoomTypes from "./pages/AdminRoomTypes";
 import AdminRoomBooking from "./pages/AdminRoomBooking";
 import AdminLayout from "./components/AdminLayout";
 import AdminRestaurantOrders from "./pages/AdminRestaurantOrders";
+import OnlineOrders from "./pages/admin/OnlineOrders";
 import GeneralPOS from "./pages/admin/GeneralPOS";
 import GeneralProductManagement from "./pages/admin/GeneralProductManagement";
 import GeneralBillHistory from "./pages/admin/GeneralBillHistory";
 import RestaurantTables from "./pages/admin/RestaurantTables";
-
 
 // Kitchen and Reception
 import KitchenKOT from "./pages/KitchenKOT";
@@ -56,6 +54,9 @@ import WaiterDashboard from "./waiter/WaiterDashboard";
 import WaiterTables from "./waiter/WaiterTables";
 import CreateOrder from "./waiter/CreateOrder";
 import WaiterOrders from "./waiter/WaiterOrders";
+
+// Delivery Boy
+import DeliveryBoyDashboard from "./delivery/DeliveryBoyDashboard";
 
 function App() {
     const location = useLocation();
@@ -94,34 +95,27 @@ function App() {
 
     const isCustomer = ["customer", "user"].includes(normalizedRole);
 
-    // Default destination by role
+    // Dashboard path according to role
     const getDashboardPath = (role) => {
         const normalized = String(role || "")
             .trim()
             .toLowerCase()
             .replace(/[\s-]+/g, "_");
 
-        if (["admin", "manager"].includes(normalized)) {
-            return "/admin";
-        }
+        const dashboardPaths = {
+            admin: "/admin",
+            manager: "/admin",
+            receptionist: "/reception/billing",
+            waiter: "/waiter",
+            kitchen: "/kitchen",
+            accountant: "/admin",
+            hr: "/admin",
+            delivery_boy: "/delivery-dashboard",
+            customer: "/",
+            user: "/",
+        };
 
-        if (normalized === "waiter") {
-            return "/waiter";
-        }
-
-        if (normalized === "kitchen") {
-            return "/kitchen";
-        }
-
-        if (normalized === "receptionist") {
-            return "/reception/billing";
-        }
-
-        if (["customer", "user"].includes(normalized)) {
-    return "/";
-}
-
-        return "/";
+        return dashboardPaths[normalized] || "/";
     };
 
     // Login callback
@@ -186,6 +180,7 @@ function App() {
                     <path d="M20.9 13.1A8.5 8.5 0 0 1 10.9 3.1 8.5 8.5 0 1 0 20.9 13.1Z" />
                 )}
             </svg>
+
             <span>
                 {theme === "dark" ? "Light theme" : "Dark theme"}
             </span>
@@ -246,8 +241,7 @@ function App() {
                 isCustomer ? " customer-app" : ""
             }`}
         >
-            {/* STAFF NAVBAR ONLY.
-                Customer navbar is managed by Home.jsx. */}
+            {/* Staff Navbar */}
             {isLoggedIn && !isCustomer && (
                 <header className="app-topbar">
                     <Link to="/" className="brand-lockup">
@@ -281,6 +275,7 @@ function App() {
                                 currentUser?.fullName ||
                                 currentUser?.email ||
                                 "User"}
+
                             <small>{currentUser?.role || "User"}</small>
                         </span>
 
@@ -304,7 +299,7 @@ function App() {
                         : "app-content"
                 }
             >
-                {/* Customer welcome banner */}
+                {/* Customer Welcome Banner */}
                 {isLoggedIn &&
                     isCustomer &&
                     location.pathname === "/rooms" && (
@@ -335,6 +330,7 @@ function App() {
                             >
                                 <span className="orbit orbit-one" />
                                 <span className="orbit orbit-two" />
+
                                 <span className="orbit-core">
                                     <svg viewBox="0 0 48 48" fill="none">
                                         <path
@@ -351,17 +347,17 @@ function App() {
                     )}
 
                 <Routes>
-                    {/* Public homepage */}
+                    {/* Public Homepage */}
                     <Route
-    path="/"
-    element={
-        <Home
-            isLoggedIn={isLoggedIn}
-            currentUser={currentUser}
-            onLogout={handleLogout}
-        />
-    }
-/>
+                        path="/"
+                        element={
+                            <Home
+                                isLoggedIn={isLoggedIn}
+                                currentUser={currentUser}
+                                onLogout={handleLogout}
+                            />
+                        }
+                    />
 
                     {/* Login */}
                     <Route
@@ -378,7 +374,7 @@ function App() {
                         }
                     />
 
-                    {/* Customer signup */}
+                    {/* Signup */}
                     <Route
                         path="/signup"
                         element={
@@ -393,43 +389,48 @@ function App() {
                         }
                     />
 
-                    {/* Customer profile */}
+                    {/* Customer Profile */}
                     <Route
                         path="/profile"
                         element={customerRoute(<Profile />)}
                     />
 
-                    {/* Public browsing */}
+                    {/* Public Browsing */}
                     <Route path="/menu" element={<Menu />} />
                     <Route path="/rooms" element={<Rooms />} />
 
-                    {/* Customer pages */}
+                    {/* Customer Pages */}
                     <Route
                         path="/booking-details"
                         element={customerRoute(<BookingDetails />)}
                     />
+
                     <Route
                         path="/book-room"
                         element={customerRoute(<BookRoom />)}
                     />
+
                     <Route
                         path="/cart"
                         element={customerRoute(<Cart />)}
                     />
+
                     <Route
                         path="/checkout"
                         element={customerRoute(<Checkout />)}
                     />
+
                     <Route
                         path="/my-orders"
                         element={customerRoute(<MyOrders />)}
                     />
+
                     <Route
                         path="/my-bookings"
                         element={customerRoute(<MyBookings />)}
                     />
 
-                    {/* Payment success */}
+                    {/* Payment Success */}
                     <Route
                         path="/payment-success"
                         element={<PaymentSuccess />}
@@ -458,6 +459,7 @@ function App() {
                             ["admin", "manager", "receptionist"]
                         )}
                     />
+
                     <Route
                         path="/restaurant-bill-history"
                         element={staffRoute(
@@ -474,44 +476,64 @@ function App() {
                             ["admin", "manager"]
                         )}
                     >
-                        <Route
-  path="/admin/restaurant-tables"
-  element={<RestaurantTables />}
-/>
-                        <Route
-  path="/admin/general-products"
-  element={<GeneralProductManagement />}
-/>
-<Route
-  path="/admin/general-bill-history"
-  element={<GeneralBillHistory />}
-/>
                         <Route index element={<AdminDashboard />} />
+
                         <Route path="staff" element={<AdminStaff />} />
-                        <Route
-                            path="restaurant-orders"
-                            element={<AdminRestaurantOrders />}
-                        />
-                        <Route path="/admin/general-pos" element={<GeneralPOS />} />
-                        <Route
-                            path="bookings"
-                            element={<AdminBookings />}
-                        />
+                        <Route path="menu" element={<AdminMenu />} />
+                        <Route path="bookings" element={<AdminBookings />} />
                         <Route path="rooms" element={<AdminRooms />} />
+
                         <Route
                             path="room-types"
                             element={<AdminRoomTypes />}
                         />
+
                         <Route
                             path="room-booking"
                             element={<AdminRoomBooking />}
                         />
-                        <Route path="menu" element={<AdminMenu />} />
+
+                        <Route
+                            path="restaurant-orders"
+                            element={<AdminRestaurantOrders />}
+                        />
+
+                        {/* Online Delivery Orders */}
+                        <Route
+                            path="online-order"
+                            element={<OnlineOrders />}
+                        />
+
+                        {/* General POS */}
+                        <Route
+                            path="general-pos"
+                            element={<GeneralPOS />}
+                        />
+
+                        <Route
+                            path="general-products"
+                            element={<GeneralProductManagement />}
+                        />
+
+                        <Route
+                            path="general-bill-history"
+                            element={<GeneralBillHistory />}
+                        />
+
+                        {/* Restaurant Tables */}
+                        <Route
+                            path="restaurant-tables"
+                            element={<RestaurantTables />}
+                        />
+
+                        {/* Kitchen and Billing */}
                         <Route path="kitchen" element={<KitchenKOT />} />
+
                         <Route
                             path="billing"
                             element={<ReceptionBilling />}
                         />
+
                         <Route
                             path="bill-history"
                             element={<RestaurantBillHistory />}
@@ -527,19 +549,31 @@ function App() {
                         )}
                     >
                         <Route index element={<WaiterDashboard />} />
+
                         <Route
                             path="tables"
                             element={<WaiterTables />}
                         />
+
                         <Route
                             path="create-order"
                             element={<CreateOrder />}
                         />
+
                         <Route
                             path="orders"
                             element={<WaiterOrders />}
                         />
                     </Route>
+
+                    {/* Delivery Boy Dashboard */}
+                    <Route
+                        path="/delivery-dashboard"
+                        element={staffRoute(
+                            <DeliveryBoyDashboard />,
+                            ["delivery_boy"]
+                        )}
+                    />
 
                     {/* Invalid URL */}
                     <Route

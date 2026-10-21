@@ -194,6 +194,7 @@ export default function AdminStaff() {
             <option value="kitchen">Kitchen Staff</option>
             <option value="accountant">Accountant</option>
             <option value="hr">HR</option>
+            <option value="delivery_boy">Delivery Boy</option>
           </select>
 
           {!editingId && (

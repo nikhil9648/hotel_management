@@ -3,19 +3,21 @@ import { NavLink, Outlet, Navigate, useNavigate } from "react-router-dom";
 
 const menuItems = [
     { label: "Dashboard", path: "/admin", icon: "📊" },
-    { label: "Staff Management", path: "/admin/staff", icon: "👥" },
-    { label: "Food Menu", path: "/admin/menu", icon: "🍽️" },
-    { label: "Room Management", path: "/admin/rooms" },
-
-    { label: "Restaurant Orders", path: "/admin/restaurant-orders", icon: "🍛" },
-
-    { label: "Room Type Management", path: "/admin/room-types" },
+    { label: "Reception Billing", path: "/admin/billing", icon: "🧾" },
+    { label: "Online Orders", path: "/admin/online-order", icon: "🛵" },
     {
         label: "Room Booking",
         path: "/admin/room-booking",
     },
+    { label: "Staff Management", path: "/admin/staff", icon: "👥" },
+    { label: "Food Menu", path: "/admin/menu", icon: "🍽️" },
+    { label: "Room Management", path: "/admin/rooms" },
+    { label: "Restaurant Orders", path: "/admin/restaurant-orders", icon: "🍛" },
+
+    { label: "Room Type Management", path: "/admin/room-types" },
+    
     { label: "Kitchen Orders", path: "/admin/kitchen", icon: "👨‍🍳" },
-    { label: "Reception Billing", path: "/admin/billing", icon: "🧾" },
+    
     { label: "Bill History", path: "/admin/bill-history", icon: "📑" },
     { label: "Restaurant Tables", path: "/admin/restaurant-tables" },
     { label: "Product Billing", path: "/admin/general-pos" },

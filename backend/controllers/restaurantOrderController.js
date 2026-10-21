@@ -1,13 +1,24 @@
-
 const mongoose = require("mongoose");
+const crypto = require("crypto");
+
 const RestaurantOrder = require("../models/RestaurantOrder");
 const RestaurantTable = require("../models/RestaurantTable");
 const FoodItem = require("../models/FoodItem");
+const User = require("../models/User");
+const Coupon = require("../models/Coupon");
+
+const transporter = require("../config/mailer");
+const generateRestaurantInvoice = require("../utils/generateRestaurantInvoice");
 
 const TAX_RATE = 0.18;
+const OTP_EXPIRY_HOURS = 24;
+const MAX_OTP_ATTEMPTS = 5;
 
 const VALID_ORDER_TYPES = ["dine-in", "takeaway", "delivery"];
-const VALID_PAYMENT_METHODS = ["cash", "card", "upi", "razorpay", "pending"];
+const VALID_PAYMENT_METHODS = [
+    "cash", "card", "upi", "razorpay", "pending",
+];
+
 const VALID_ORDER_STATUSES = [
     "pending",
     "confirmed",
@@ -15,11 +26,72 @@ const VALID_ORDER_STATUSES = [
     "ready",
     "served",
     "cancelled",
+    "out_for_delivery",
+    "delivered",
 ];
+
 const VALID_SERVING_TYPES = ["dine-in", "takeaway"];
 
 const roundMoney = (amount) =>
     Math.round(Number(amount) * 100) / 100;
+
+const sendError = (res, status, message) =>
+    res.status(status).json({ success: false, message });
+
+const isValidId = (id) =>
+    mongoose.Types.ObjectId.isValid(id);
+
+const getOtpEncryptionKey = () => {
+    const key = process.env.DELIVERY_OTP_ENCRYPTION_KEY;
+
+    if (!key || !/^[a-fA-F0-9]{64}$/.test(key)) {
+        throw new Error(
+            "DELIVERY_OTP_ENCRYPTION_KEY must be a 32-byte hex key"
+        );
+    }
+
+    return Buffer.from(key, "hex");
+};
+
+const encryptDeliveryOtp = (otp) => {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv(
+        "aes-256-gcm",
+        getOtpEncryptionKey(),
+        iv
+    );
+
+    const encrypted = Buffer.concat([
+        cipher.update(otp, "utf8"),
+        cipher.final(),
+    ]);
+
+    return [
+        iv.toString("hex"),
+        cipher.getAuthTag().toString("hex"),
+        encrypted.toString("hex"),
+    ].join(":");
+};
+
+const decryptDeliveryOtp = (value) => {
+    const [ivHex, tagHex, dataHex] = value.split(":");
+
+    const decipher = crypto.createDecipheriv(
+        "aes-256-gcm",
+        getOtpEncryptionKey(),
+        Buffer.from(ivHex, "hex")
+    );
+
+    decipher.setAuthTag(Buffer.from(tagHex, "hex"));
+
+    return Buffer.concat([
+        decipher.update(Buffer.from(dataHex, "hex")),
+        decipher.final(),
+    ]).toString("utf8");
+};
+
+const generateDeliveryOtp = () =>
+    crypto.randomInt(0, 10000).toString().padStart(4, "0");
 
 const getFoodPrice = (food) => {
     const discount = Number(food.discountPrice);
@@ -40,34 +112,40 @@ const populateOrder = (query) =>
         .populate("customer", "name email phone")
         .populate("table", "tableNumber capacity status")
         .populate("waiter", "name email")
+        .populate("deliveryBoy", "name email phone")
         .populate("items.food", "name price discountPrice foodType image");
 
-const sendError = (res, status, message) =>
-    res.status(status).json({
-        success: false,
-        message,
-    });
-
 const recalculateOrder = (order) => {
-    const subtotal = roundMoney(
-        order.items.reduce(
-            (sum, item) =>
-                sum + roundMoney(item.price * item.quantity),
-            0
-        )
+  const subtotal = roundMoney(
+    order.items.reduce(
+      (sum, item) =>
+        sum + roundMoney(Number(item.price) * Number(item.quantity)),
+      0
+    )
+  );
+
+  order.items.forEach((item) => {
+    item.total = roundMoney(
+      Number(item.price) * Number(item.quantity)
     );
+  });
 
-    order.items.forEach((item) => {
-        item.total = roundMoney(item.price * item.quantity);
-    });
+  const discountAmount = roundMoney(
+    Math.min(
+      Math.max(0, Number(order.discountAmount || 0)),
+      subtotal
+    )
+  );
 
-    order.subtotal = subtotal;
-    order.taxAmount = roundMoney(subtotal * TAX_RATE);
-    order.totalAmount = roundMoney(subtotal + order.taxAmount);
+  order.subtotal = subtotal;
+  order.discountAmount = discountAmount;
+  order.taxAmount = roundMoney(
+    (subtotal - discountAmount) * TAX_RATE
+  );
+  order.totalAmount = roundMoney(
+    subtotal - discountAmount + order.taxAmount
+  );
 };
-
-const isValidId = (id) =>
-    mongoose.Types.ObjectId.isValid(id);
 
 const canManageOrder = (req, order) => {
     const role = req.user?.role;
@@ -86,19 +164,13 @@ const canManageOrder = (req, order) => {
 const getTableFromRequest = async ({ table, tableNumber }) => {
     if (table) {
         if (!isValidId(table)) {
-            return {
-                error: "Invalid table ID",
-                status: 400,
-            };
+            return { error: "Invalid table ID", status: 400 };
         }
 
         const tableData = await RestaurantTable.findById(table);
 
         if (!tableData) {
-            return {
-                error: "Restaurant table not found",
-                status: 404,
-            };
+            return { error: "Restaurant table not found", status: 404 };
         }
 
         return { tableData };
@@ -110,10 +182,7 @@ const getTableFromRequest = async ({ table, tableNumber }) => {
         });
 
         if (!tableData) {
-            return {
-                error: "Restaurant table not found",
-                status: 404,
-            };
+            return { error: "Restaurant table not found", status: 404 };
         }
 
         return { tableData };
@@ -155,7 +224,7 @@ const processItems = async (items) => {
 
         if (!VALID_SERVING_TYPES.includes(servingType)) {
             return {
-                error: "Invalid serving type for food item",
+                error: "Invalid serving type",
                 status: 400,
             };
         }
@@ -163,10 +232,7 @@ const processItems = async (items) => {
         const food = await FoodItem.findById(foodId);
 
         if (!food) {
-            return {
-                error: "Food item not found",
-                status: 404,
-            };
+            return { error: "Food item not found", status: 404 };
         }
 
         if (food.isAvailable === false) {
@@ -194,6 +260,65 @@ const processItems = async (items) => {
     return { processed };
 };
 
+// Send invoice and delivery OTP in one email.
+const sendDeliveryInvoiceEmail = async (order, customer, otp) => {
+    if (!customer?.email) {
+        throw new Error("Customer email is not available");
+    }
+
+    const invoiceBuffer = await generateRestaurantInvoice(
+        order,
+        customer
+    );
+
+    await transporter.sendMail({
+        from: process.env.SMTP_USER,
+        to: customer.email,
+        subject: `Order Confirmation and Delivery OTP`,
+        text: [
+            `Hello ${customer.name || order.customerName},`,
+            "",
+            "Your online delivery order has been placed successfully.",
+            `Order ID: ${order._id}`,
+            `Delivery OTP: ${otp}`,
+            "",
+            "Share this OTP with the delivery person when your order arrives.",
+            "Please do not share it before receiving your order.",
+            "",
+            "Your invoice is attached to this email.",
+        ].join("\n"),
+        attachments: [
+            {
+                filename: `invoice-${order._id}.pdf`,
+                content: invoiceBuffer,
+                contentType: "application/pdf",
+            },
+        ],
+    });
+};
+
+const sendDeliveryConfirmationEmail = async (order, customer) => {
+    if (!customer?.email) {
+        throw new Error("Customer email is not available");
+    }
+
+    await transporter.sendMail({
+        from: process.env.SMTP_USER,
+        to: customer.email,
+        subject: "Your order has been delivered",
+        text: [
+            `Hello ${customer.name || order.customerName},`,
+            "",
+            "Your restaurant delivery order has been delivered successfully.",
+            `Order ID: ${order._id}`,
+            `Total: Rs. ${Number(order.totalAmount || 0).toFixed(2)}`,
+            `Delivered at: ${new Date(order.deliveredAt).toLocaleString("en-IN")}`,
+            "",
+            "Thank you for ordering with us!",
+        ].join("\n"),
+    });
+};
+
 // =====================================================
 // CREATE ORDER
 // POST /api/restaurant-orders
@@ -212,53 +337,30 @@ const createRestaurantOrder = async (req, res) => {
             paymentMethod = "cash",
             notes = "",
             parentOrder,
+            couponCode,
         } = req.body || {};
 
-        // Validate customer details
         if (
             typeof customerName !== "string" ||
             !customerName.trim()
         ) {
-            return sendError(
-                res,
-                400,
-                "Customer name is required"
-            );
+            return sendError(res, 400, "Customer name is required");
         }
 
         if (
             typeof customerMobile !== "string" &&
             typeof customerMobile !== "number"
         ) {
-            return sendError(
-                res,
-                400,
-                "Customer mobile number is required"
-            );
+            return sendError(res, 400, "Customer mobile is required");
         }
 
         const normalizedMobile = String(customerMobile).trim();
 
-        if (!normalizedMobile) {
-            return sendError(
-                res,
-                400,
-                "Customer mobile number is required"
-            );
+        if (!normalizedMobile || normalizedMobile.length > 20) {
+            return sendError(res, 400, "Invalid customer mobile number");
         }
 
-        if (normalizedMobile.length > 20) {
-            return sendError(
-                res,
-                400,
-                "Customer mobile number cannot exceed 20 characters"
-            );
-        }
-
-        if (
-            paymentMethod !== "pending" &&
-            !VALID_PAYMENT_METHODS.includes(paymentMethod)
-        ) {
+        if (!VALID_PAYMENT_METHODS.includes(paymentMethod)) {
             return sendError(res, 400, "Invalid payment method");
         }
 
@@ -281,81 +383,73 @@ const createRestaurantOrder = async (req, res) => {
 
         if (parentOrder) {
             if (!isValidId(parentOrder)) {
-                return sendError(
-                    res,
-                    400,
-                    "Invalid original order ID"
-                );
+                return sendError(res, 400, "Invalid original order ID");
             }
 
             originalOrder = await RestaurantOrder.findById(parentOrder);
 
             if (!originalOrder) {
-                return sendError(
-                    res,
-                    404,
-                    "Original order not found"
-                );
+                return sendError(res, 404, "Original order not found");
             }
 
             if (!canManageOrder(req, originalOrder)) {
-                return sendError(
-                    res,
-                    403,
-                    "You are not allowed to add items for this order"
-                );
+                return sendError(res, 403, "Not allowed to add items");
             }
 
-            if (originalOrder.paymentStatus === "paid") {
-                return sendError(
-                    res,
-                    400,
-                    "Cannot add items because this order is already paid"
-                );
-            }
-
-            if (!originalOrder.table) {
+            if (
+                originalOrder.paymentStatus === "paid" ||
+                !originalOrder.table
+            ) {
                 return sendError(
                     res,
                     400,
-                    "Original order has no table assigned"
+                    "Cannot add items to this original order"
                 );
             }
         }
-
-        const resolvedOrderType =
-            orderType ||
-            (
-                table ||
-                tableNumber ||
-                orderItems.some(
-                    (item) => item.servingType === "dine-in"
-                )
-                    ? "dine-in"
-                    : "takeaway"
-            );
-
-        if (
-            resolvedOrderType === "delivery" &&
-            !String(deliveryAddress).trim()
-        ) {
-            return sendError(
-                res,
-                400,
-                "Delivery address is required"
-            );
-        }
-
-        let tableData = null;
 
         const hasDineInItems = orderItems.some(
             (item) => item.servingType === "dine-in"
         );
 
+        const resolvedOrderType =
+            orderType ||
+            (table || tableNumber || hasDineInItems
+                ? "dine-in"
+                : "takeaway");
+
         if (
-            resolvedOrderType === "dine-in" ||
+            resolvedOrderType === "delivery" &&
+            !String(deliveryAddress).trim()
+        ) {
+            return sendError(res, 400, "Delivery address is required");
+        }
+
+        if (
+            resolvedOrderType === "delivery" &&
             hasDineInItems
         ) {
+            return sendError(
+                res,
+                400,
+                "Delivery orders cannot contain dine-in items"
+            );
+        }
+
+        if (
+            resolvedOrderType === "takeaway" &&
+            hasDineInItems
+        ) {
+            return sendError(
+                res,
+                400,
+                "Takeaway orders cannot contain dine-in items"
+            );
+        }
+
+        let tableData = null;
+
+        if (resolvedOrderType === "dine-in" || hasDineInItems) {
             const tableResult = await getTableFromRequest({
                 table,
                 tableNumber,
@@ -371,49 +465,18 @@ const createRestaurantOrder = async (req, res) => {
 
             tableData = tableResult.tableData;
 
-            if (!tableData) {
+            if (!tableData || tableData.isActive === false) {
                 return sendError(
                     res,
                     400,
-                    "A table is required for dine-in items"
+                    "An active table is required for dine-in"
                 );
             }
-
-            if (tableData.isActive === false) {
-                return sendError(
-                    res,
-                    400,
-                    "This table is inactive"
-                );
-            }
-        }
-
-        if (
-            resolvedOrderType === "takeaway" &&
-            hasDineInItems
-        ) {
-            return sendError(
-                res,
-                400,
-                "A takeaway-only order cannot contain dine-in items"
-            );
-        }
-
-        if (
-            resolvedOrderType === "delivery" &&
-            hasDineInItems
-        ) {
-            return sendError(
-                res,
-                400,
-                "Delivery orders cannot contain dine-in items"
-            );
         }
 
         if (
             originalOrder &&
-            String(tableData?._id || "") !==
-                String(originalOrder.table)
+            String(tableData?._id || "") !== String(originalOrder.table)
         ) {
             return sendError(
                 res,
@@ -421,20 +484,79 @@ const createRestaurantOrder = async (req, res) => {
                 "Additional items must use the original table"
             );
         }
+        let appliedCoupon = null;
+let discountAmount = 0;
 
+if (couponCode && String(couponCode).trim()) {
+  const normalizedCode = String(couponCode).trim().toUpperCase();
+
+  appliedCoupon = await Coupon.findOne({
+    code: normalizedCode,
+    isActive: true,
+  });
+
+  if (!appliedCoupon) {
+    return sendError(res, 400, "Invalid or inactive coupon");
+  }
+
+  if (
+    appliedCoupon.expiresAt &&
+    new Date(appliedCoupon.expiresAt).getTime() < Date.now()
+  ) {
+    return sendError(res, 400, "This coupon has expired");
+  }
+
+  const subtotalBeforeDiscount = roundMoney(
+    orderItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    )
+  );
+
+  if (
+    subtotalBeforeDiscount <
+    Number(appliedCoupon.minOrderAmount || 0)
+  ) {
+    return sendError(
+      res,
+      400,
+      `Minimum order amount is ₹${appliedCoupon.minOrderAmount}`
+    );
+  }
+
+  if (appliedCoupon.discountType === "percentage") {
+    discountAmount =
+      subtotalBeforeDiscount *
+      Number(appliedCoupon.discountValue) / 100;
+
+    if (appliedCoupon.maxDiscount != null) {
+      discountAmount = Math.min(
+        discountAmount,
+        Number(appliedCoupon.maxDiscount)
+      );
+    }
+  } else {
+    discountAmount = Number(appliedCoupon.discountValue);
+  }
+
+  discountAmount = roundMoney(
+    Math.min(
+      Math.max(0, discountAmount),
+      subtotalBeforeDiscount
+    )
+  );
+}
         const order = new RestaurantOrder({
-            // Customer details saved directly in MongoDB
             customerName: customerName.trim(),
             customerMobile: normalizedMobile,
-
             customer: req.user?._id || null,
             table: tableData?._id || null,
             waiter:
-                req.user?.role === "waiter"
-                    ? req.user._id
-                    : null,
+                req.user?.role === "waiter" ? req.user._id : null,
             parentOrder: originalOrder?._id || null,
             orderType: resolvedOrderType,
+            couponCode: appliedCoupon?.code || null,
+discountAmount,
             deliveryAddress:
                 resolvedOrderType === "delivery"
                     ? String(deliveryAddress).trim()
@@ -446,14 +568,51 @@ const createRestaurantOrder = async (req, res) => {
             notes: String(notes || "").trim(),
         });
 
-        recalculateOrder(order);
+        let deliveryOtp = null;
 
-        // Mongoose timestamps automatically sets createdAt and updatedAt.
+        if (resolvedOrderType === "delivery") {
+            // Generate OTP at order placement.
+            deliveryOtp = generateDeliveryOtp();
+            order.deliveryOtpEncrypted = encryptDeliveryOtp(deliveryOtp);
+            order.deliveryOtpExpiresAt = new Date(
+                Date.now() + OTP_EXPIRY_HOURS * 60 * 60 * 1000
+            );
+            order.deliveryOtpAttempts = 0;
+        }
+
+        recalculateOrder(order);
         await order.save();
 
         if (tableData) {
             tableData.status = "occupied";
             await tableData.save();
+        }
+
+        // Do not fail order creation if email delivery fails.
+        if (resolvedOrderType === "delivery") {
+            try {
+                const customer = req.user?._id
+                    ? await User.findById(req.user._id)
+                        .select("name email phone")
+                    : null;
+
+                if (!customer?.email) {
+                    console.error(
+                        `Order ${order._id} saved but customer email was not found`
+                    );
+                } else {
+                    await sendDeliveryInvoiceEmail(
+                        order,
+                        customer,
+                        deliveryOtp
+                    );
+                }
+            } catch (emailError) {
+                console.error(
+                    "Order invoice/OTP email failed:",
+                    emailError.message
+                );
+            }
         }
 
         const populatedOrder = await populateOrder(
@@ -464,23 +623,20 @@ const createRestaurantOrder = async (req, res) => {
             success: true,
             message: "Restaurant order created successfully",
             order: populatedOrder,
+            emailNotice:
+                resolvedOrderType === "delivery"
+                    ? "Order saved. Check server logs if the invoice/OTP email did not arrive."
+                    : undefined,
         });
     } catch (error) {
         console.error("Create Restaurant Order Error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Unable to create restaurant order",
-            error:
-                process.env.NODE_ENV === "development"
-                    ? error.message
-                    : undefined,
-        });
+        return sendError(res, 500, "Unable to create restaurant order");
     }
 };
 
 // =====================================================
 // GET MY ORDERS
+// Customer sees OTP only for their own delivery orders.
 // =====================================================
 
 const getMyRestaurantOrders = async (req, res) => {
@@ -491,44 +647,59 @@ const getMyRestaurantOrders = async (req, res) => {
         if (["customer", "user"].includes(role)) {
             filter.customer = req.user._id;
         } else if (role === "waiter") {
-    filter.waiter = req.user._id;
-    filter.orderType = { $ne: "delivery" };
-}
-        else if (
+            filter.waiter = req.user._id;
+            filter.orderType = { $ne: "delivery" };
+        } else if (
             !["admin", "manager", "kitchen", "accountant"].includes(role)
         ) {
-            return sendError(
-                res,
-                403,
-                "You are not allowed to view these orders"
-            );
+            return sendError(res, 403, "Not allowed to view these orders");
         }
 
         if (req.query.status) {
             if (!VALID_ORDER_STATUSES.includes(req.query.status)) {
                 return sendError(res, 400, "Invalid order status");
             }
-
             filter.orderStatus = req.query.status;
         }
 
-        const orders = await populateOrder(
-            RestaurantOrder.find(filter).sort({ createdAt: -1 })
-        );
+        const query = RestaurantOrder.find(filter).sort({ createdAt: -1 });
+
+        // OTP is returned only to the authenticated customer who owns it.
+        if (["customer", "user"].includes(role)) {
+            query.select("+deliveryOtpEncrypted");
+        }
+
+        const orders = await populateOrder(query);
+
+        const responseOrders = orders.map((order) => {
+            const data = order.toObject();
+
+            if (["customer", "user"].includes(role)) {
+                if (
+                    data.orderType === "delivery" &&
+                    data.deliveryOtpEncrypted &&
+                    !data.deliveryOtpVerifiedAt &&
+                    data.deliveryOtpExpiresAt &&
+                    new Date(data.deliveryOtpExpiresAt) > new Date()
+                ) {
+                    data.deliveryOtp = decryptDeliveryOtp(
+                        data.deliveryOtpEncrypted
+                    );
+                }
+            }
+
+            delete data.deliveryOtpEncrypted;
+            return data;
+        });
 
         return res.status(200).json({
             success: true,
-            count: orders.length,
-            orders,
+            count: responseOrders.length,
+            orders: responseOrders,
         });
     } catch (error) {
         console.error("Get My Restaurant Orders Error:", error);
-
-        return sendError(
-            res,
-            500,
-            "Unable to fetch restaurant orders"
-        );
+        return sendError(res, 500, "Unable to fetch restaurant orders");
     }
 };
 
@@ -577,12 +748,7 @@ const getTableOrders = async (req, res) => {
         });
     } catch (error) {
         console.error("Get Table Orders Error:", error);
-
-        return sendError(
-            res,
-            500,
-            "Unable to fetch table orders"
-        );
+        return sendError(res, 500, "Unable to fetch table orders");
     }
 };
 
@@ -597,20 +763,15 @@ const getAllRestaurantOrders = async (req, res) => {
                 req.user?.role
             )
         ) {
-            return sendError(
-                res,
-                403,
-                "You are not allowed to view all orders"
-            );
+            return sendError(res, 403, "Not allowed to view all orders");
         }
 
-        const filter = {};
+        const filter = { billGenerated: { $ne: true } };
 
         if (req.query.status) {
             if (!VALID_ORDER_STATUSES.includes(req.query.status)) {
                 return sendError(res, 400, "Invalid order status");
             }
-
             filter.orderStatus = req.query.status;
         }
 
@@ -625,12 +786,7 @@ const getAllRestaurantOrders = async (req, res) => {
         });
     } catch (error) {
         console.error("Get All Restaurant Orders Error:", error);
-
-        return sendError(
-            res,
-            500,
-            "Unable to fetch restaurant orders"
-        );
+        return sendError(res, 500, "Unable to fetch restaurant orders");
     }
 };
 
@@ -643,56 +799,66 @@ const getRestaurantOrderById = async (req, res) => {
         const { id } = req.params;
 
         if (!isValidId(id)) {
-            return sendError(
-                res,
-                400,
-                "Invalid restaurant order ID"
-            );
+            return sendError(res, 400, "Invalid restaurant order ID");
         }
 
-        const order = await RestaurantOrder.findById(id);
+        const role = req.user?.role;
+        const isCustomer = ["customer", "user"].includes(role);
+
+        const query = RestaurantOrder.findById(id);
+
+        if (isCustomer) query.select("+deliveryOtpEncrypted");
+
+        const order = await query;
 
         if (!order) {
-            return sendError(
-                res,
-                404,
-                "Restaurant order not found"
-            );
+            return sendError(res, 404, "Restaurant order not found");
         }
+
+        const isOwner =
+            String(order.customer || "") === String(req.user?._id || "");
+
+        const isAssignedDeliveryBoy =
+            role === "delivery_boy" &&
+            String(order.deliveryBoy || "") === String(req.user?._id || "");
 
         if (
             !canManageOrder(req, order) &&
-            String(order.customer || "") !== String(req.user?._id || "")
+            !isOwner &&
+            !isAssignedDeliveryBoy
         ) {
-            return sendError(
-                res,
-                403,
-                "You are not allowed to view this order"
-            );
+            return sendError(res, 403, "Not allowed to view this order");
         }
 
         const populatedOrder = await populateOrder(
             RestaurantOrder.findById(id)
         );
 
-        return res.status(200).json({
-            success: true,
-            order: populatedOrder,
-        });
+        const data = populatedOrder.toObject();
+
+        // Never expose OTP to staff or delivery boy through this endpoint.
+        if (isCustomer && isOwner && order.deliveryOtpEncrypted) {
+            if (
+                !order.deliveryOtpVerifiedAt &&
+                order.deliveryOtpExpiresAt > new Date()
+            ) {
+                data.deliveryOtp = decryptDeliveryOtp(
+                    order.deliveryOtpEncrypted
+                );
+            }
+        }
+
+        delete data.deliveryOtpEncrypted;
+
+        return res.status(200).json({ success: true, order: data });
     } catch (error) {
         console.error("Get Restaurant Order Error:", error);
-
-        return sendError(
-            res,
-            500,
-            "Unable to fetch restaurant order"
-        );
+        return sendError(res, 500, "Unable to fetch restaurant order");
     }
 };
 
 // =====================================================
-// ADD ITEMS TO AN EXISTING ORDER
-// PUT /api/restaurant-orders/:id/items
+// ADD ITEMS
 // =====================================================
 
 const addItemsToRestaurantOrder = async (req, res) => {
@@ -700,78 +866,61 @@ const addItemsToRestaurantOrder = async (req, res) => {
         const { id } = req.params;
 
         if (!isValidId(id)) {
-            return sendError(
-                res,
-                400,
-                "Invalid restaurant order ID"
-            );
+            return sendError(res, 400, "Invalid restaurant order ID");
         }
 
         const order = await RestaurantOrder.findById(id);
 
         if (!order) {
-            return sendError(
-                res,
-                404,
-                "Restaurant order not found"
-            );
+            return sendError(res, 404, "Restaurant order not found");
         }
 
         if (!canManageOrder(req, order)) {
-            return sendError(
-                res,
-                403,
-                "You are not allowed to update this order"
-            );
+            return sendError(res, 403, "Not allowed to update this order");
         }
 
-        if (["served", "cancelled"].includes(order.orderStatus)) {
-            return sendError(
-                res,
-                400,
-                "Items cannot be added to a served or cancelled order"
-            );
+        if (
+            ["served", "delivered", "cancelled"].includes(order.orderStatus)
+        ) {
+            return sendError(res, 400, "This order is already closed");
         }
 
         const itemResult = await processItems(req.body?.items);
 
         if (itemResult.error) {
-            return sendError(
-                res,
-                itemResult.status,
-                itemResult.error
-            );
+            return sendError(res, itemResult.status, itemResult.error);
         }
 
-        const addedItems = itemResult.processed;
-        const combinedItems = [...order.items, ...addedItems];
+        const combinedItems = [
+            ...order.items,
+            ...itemResult.processed,
+        ];
 
-        const hasDineInItems = combinedItems.some(
-            (item) => item.servingType === "dine-in"
-        );
-
-        if (hasDineInItems && !order.table) {
+        if (
+            combinedItems.some((item) => item.servingType === "dine-in") &&
+            !order.table
+        ) {
             return sendError(
                 res,
                 400,
-                "This order needs a table before adding dine-in items"
+                "A table is required for dine-in items"
             );
         }
 
         if (
             order.orderType === "delivery" &&
-            addedItems.some(
+            itemResult.processed.some(
                 (item) => item.servingType === "dine-in"
             )
         ) {
             return sendError(
                 res,
                 400,
-                "Dine-in items cannot be added to a delivery order"
+                "Dine-in items cannot be added to delivery orders"
             );
         }
 
-        order.items.push(...addedItems);
+        order.items.push(...itemResult.processed);
 
         if (order.table) {
             order.orderType = "dine-in";
@@ -788,23 +937,17 @@ const addItemsToRestaurantOrder = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            message: "Items added to order successfully",
+            message: "Items added successfully",
             order: updatedOrder,
         });
     } catch (error) {
         console.error("Add Items Error:", error);
-
-        return sendError(
-            res,
-            500,
-            "Unable to add items to order"
-        );
+        return sendError(res, 500, "Unable to add items to order");
     }
 };
 
 // =====================================================
-// UPDATE EXISTING ORDER
-// PUT /api/restaurant-orders/:id
+// UPDATE ORDER
 // =====================================================
 
 const updateRestaurantOrder = async (req, res) => {
@@ -812,37 +955,23 @@ const updateRestaurantOrder = async (req, res) => {
         const { id } = req.params;
 
         if (!isValidId(id)) {
-            return sendError(
-                res,
-                400,
-                "Invalid restaurant order ID"
-            );
+            return sendError(res, 400, "Invalid restaurant order ID");
         }
 
         const order = await RestaurantOrder.findById(id);
 
         if (!order) {
-            return sendError(
-                res,
-                404,
-                "Restaurant order not found"
-            );
+            return sendError(res, 404, "Restaurant order not found");
         }
 
         if (!canManageOrder(req, order)) {
-            return sendError(
-                res,
-                403,
-                "You are not allowed to update this order"
-            );
+            return sendError(res, 403, "Not allowed to update this order");
         }
 
-        if (["served", "cancelled"].includes(order.orderStatus)) {
-            return sendError(
-                res,
-                400,
-                "Served or cancelled orders cannot be edited"
-            );
+        if (
+            ["served", "delivered", "cancelled"].includes(order.orderStatus)
+        ) {
+            return sendError(res, 400, "Closed orders cannot be edited");
         }
 
         if (req.body?.items !== undefined) {
@@ -850,7 +979,7 @@ const updateRestaurantOrder = async (req, res) => {
                 return sendError(
                     res,
                     403,
-                    "Only admin can replace or remove order items. Use Add More Items to add items."
+                    "Only admin can replace order items"
                 );
             }
 
@@ -858,18 +987,14 @@ const updateRestaurantOrder = async (req, res) => {
                 return sendError(
                     res,
                     400,
-                    "Order items can only be edited while pending or confirmed"
+                    "Items can only be edited while pending or confirmed"
                 );
             }
 
             const itemResult = await processItems(req.body.items);
 
             if (itemResult.error) {
-                return sendError(
-                    res,
-                    itemResult.status,
-                    itemResult.error
-                );
+                return sendError(res, itemResult.status, itemResult.error);
             }
 
             if (
@@ -878,11 +1003,7 @@ const updateRestaurantOrder = async (req, res) => {
                 ) &&
                 !order.table
             ) {
-                return sendError(
-                    res,
-                    400,
-                    "A table is required for dine-in items"
-                );
+                return sendError(res, 400, "A table is required for dine-in");
             }
 
             order.items = itemResult.processed;
@@ -901,17 +1022,12 @@ const updateRestaurantOrder = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            message: "Restaurant order updated successfully",
+            message: "Restaurant order updated",
             order: updatedOrder,
         });
     } catch (error) {
         console.error("Update Restaurant Order Error:", error);
-
-        return sendError(
-            res,
-            500,
-            "Unable to update restaurant order"
-        );
+        return sendError(res, 500, "Unable to update restaurant order");
     }
 };
 
@@ -922,39 +1038,44 @@ const updateRestaurantOrder = async (req, res) => {
 const updateRestaurantOrderStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { orderStatus } = req.body || {};
+        const orderStatus = req.body?.orderStatus || req.body?.status;
 
         if (!isValidId(id)) {
-            return sendError(
-                res,
-                400,
-                "Invalid restaurant order ID"
-            );
+            return sendError(res, 400, "Invalid restaurant order ID");
         }
 
         if (!VALID_ORDER_STATUSES.includes(orderStatus)) {
             return sendError(res, 400, "Invalid order status");
         }
 
+        // Delivered status must only be set by OTP verification.
+        if (orderStatus === "delivered") {
+            return sendError(
+                res,
+                403,
+                "Delivery must be completed using OTP verification"
+            );
+        }
+
+        if (orderStatus === "out_for_delivery") {
+            return sendError(
+                res,
+                403,
+                "Use delivery assignment/start-delivery flow"
+            );
+        }
+
         const order = await RestaurantOrder.findById(id);
 
         if (!order) {
-            return sendError(
-                res,
-                404,
-                "Restaurant order not found"
-            );
+            return sendError(res, 404, "Restaurant order not found");
         }
 
         const role = req.user?.role;
 
         if (role === "waiter") {
             if (!canManageOrder(req, order)) {
-                return sendError(
-                    res,
-                    403,
-                    "You are not assigned to this order"
-                );
+                return sendError(res, 403, "Not assigned to this order");
             }
 
             if (
@@ -968,19 +1089,13 @@ const updateRestaurantOrderStatus = async (req, res) => {
                 );
             }
         } else if (!["admin", "manager", "kitchen"].includes(role)) {
-            return sendError(
-                res,
-                403,
-                "You are not allowed to change order status"
-            );
+            return sendError(res, 403, "Not allowed to change order status");
         }
 
-        if (["cancelled", "served"].includes(order.orderStatus)) {
-            return sendError(
-                res,
-                400,
-                "This order is already closed"
-            );
+        if (
+            ["cancelled", "served", "delivered"].includes(order.orderStatus)
+        ) {
+            return sendError(res, 400, "This order is already closed");
         }
 
         order.orderStatus = orderStatus;
@@ -992,17 +1107,12 @@ const updateRestaurantOrderStatus = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            message: "Restaurant order status updated successfully",
+            message: "Order status updated",
             order: updatedOrder,
         });
     } catch (error) {
         console.error("Update Order Status Error:", error);
-
-        return sendError(
-            res,
-            500,
-            "Unable to update restaurant order status"
-        );
+        return sendError(res, 500, "Unable to update order status");
     }
 };
 
@@ -1015,29 +1125,17 @@ const removeRestaurantOrderItem = async (req, res) => {
         const { id, itemId } = req.params;
 
         if (req.user?.role !== "admin") {
-            return sendError(
-                res,
-                403,
-                "Only admin can remove order items"
-            );
+            return sendError(res, 403, "Only admin can remove order items");
         }
 
         if (!isValidId(id) || !isValidId(itemId)) {
-            return sendError(
-                res,
-                400,
-                "Invalid order ID or item ID"
-            );
+            return sendError(res, 400, "Invalid order or item ID");
         }
 
         const order = await RestaurantOrder.findById(id);
 
         if (!order) {
-            return sendError(
-                res,
-                404,
-                "Restaurant order not found"
-            );
+            return sendError(res, 404, "Restaurant order not found");
         }
 
         if (!["pending", "confirmed"].includes(order.orderStatus)) {
@@ -1048,30 +1146,23 @@ const removeRestaurantOrderItem = async (req, res) => {
             );
         }
 
-        const itemIndex = order.items.findIndex(
+        const index = order.items.findIndex(
             (item) => String(item._id) === String(itemId)
         );
 
-        if (itemIndex === -1) {
-            return sendError(
-                res,
-                404,
-                "Order item not found"
-            );
+        if (index === -1) {
+            return sendError(res, 404, "Order item not found");
         }
 
         if (order.items.length === 1) {
             return sendError(
                 res,
                 400,
-                "Cannot remove the last item. Cancel the order if necessary."
+                "Cannot remove the last item; cancel the order instead"
             );
         }
 
-        const removedItem = order.items[itemIndex];
-
-        order.items.splice(itemIndex, 1);
-
+        order.items.splice(index, 1);
         recalculateOrder(order);
         await order.save();
 
@@ -1081,17 +1172,12 @@ const removeRestaurantOrderItem = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            message: `${removedItem.name || "Item"} removed successfully`,
+            message: "Order item removed",
             order: updatedOrder,
         });
     } catch (error) {
-        console.error("Remove Restaurant Order Item Error:", error);
-
-        return sendError(
-            res,
-            500,
-            "Unable to remove order item"
-        );
+        console.error("Remove Order Item Error:", error);
+        return sendError(res, 500, "Unable to remove order item");
     }
 };
 
@@ -1105,48 +1191,28 @@ const updateRestaurantOrderPayment = async (req, res) => {
         const { paymentStatus, paymentMethod } = req.body || {};
 
         if (!isValidId(id)) {
-            return sendError(
-                res,
-                400,
-                "Invalid restaurant order ID"
-            );
+            return sendError(res, 400, "Invalid restaurant order ID");
         }
 
         if (!["unpaid", "partially_paid", "paid"].includes(paymentStatus)) {
-            return sendError(
-                res,
-                400,
-                "Invalid payment status"
-            );
+            return sendError(res, 400, "Invalid payment status");
         }
 
         if (
             paymentMethod !== undefined &&
             !VALID_PAYMENT_METHODS.includes(paymentMethod)
         ) {
-            return sendError(
-                res,
-                400,
-                "Invalid payment method"
-            );
+            return sendError(res, 400, "Invalid payment method");
         }
 
         const order = await RestaurantOrder.findById(id);
 
         if (!order) {
-            return sendError(
-                res,
-                404,
-                "Restaurant order not found"
-            );
+            return sendError(res, 404, "Restaurant order not found");
         }
 
         if (!["admin", "manager", "accountant"].includes(req.user?.role)) {
-            return sendError(
-                res,
-                403,
-                "You are not allowed to update payment"
-            );
+            return sendError(res, 403, "Not allowed to update payment");
         }
 
         order.paymentStatus = paymentStatus;
@@ -1163,17 +1229,214 @@ const updateRestaurantOrderPayment = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            message: "Restaurant order payment updated successfully",
+            message: "Payment updated",
             order: updatedOrder,
         });
     } catch (error) {
-        console.error("Update Restaurant Order Payment Error:", error);
+        console.error("Update Payment Error:", error);
+        return sendError(res, 500, "Unable to update payment");
+    }
+};
 
-        return sendError(
-            res,
-            500,
-            "Unable to update restaurant order payment"
+// =====================================================
+// ASSIGN DELIVERY BOY
+// PATCH /api/restaurant-orders/:id/assign-delivery
+// =====================================================
+
+const assignDeliveryBoy = async (req, res) => {
+    try {
+        if (!["admin", "manager"].includes(req.user?.role)) {
+            return sendError(res, 403, "Only admin or manager can assign delivery");
+        }
+
+        const { id } = req.params;
+        const { deliveryBoyId } = req.body || {};
+
+        if (!isValidId(id) || !isValidId(deliveryBoyId)) {
+            return sendError(res, 400, "Invalid order ID or delivery boy ID");
+        }
+
+        const order = await RestaurantOrder.findById(id);
+
+        if (!order) {
+            return sendError(res, 404, "Restaurant order not found");
+        }
+
+        if (order.orderType !== "delivery") {
+            return sendError(res, 400, "Only delivery orders can be assigned");
+        }
+
+        if (
+            ["cancelled", "delivered"].includes(order.orderStatus)
+        ) {
+            return sendError(res, 400, "This order cannot be assigned");
+        }
+
+        const deliveryBoy = await User.findOne({
+            _id: deliveryBoyId,
+            role: "delivery_boy",
+            isActive: true,
+        }).select("name email phone");
+
+        if (!deliveryBoy) {
+            return sendError(res, 404, "Active delivery boy not found");
+        }
+
+        order.deliveryBoy = deliveryBoy._id;
+        order.deliveryAssignedAt = new Date();
+
+        if (order.orderStatus === "ready") {
+            order.orderStatus = "out_for_delivery";
+        }
+
+        await order.save();
+
+        const updatedOrder = await populateOrder(
+            RestaurantOrder.findById(order._id)
         );
+
+        return res.status(200).json({
+            success: true,
+            message: "Delivery boy assigned successfully",
+            order: updatedOrder,
+        });
+    } catch (error) {
+        console.error("Assign Delivery Boy Error:", error);
+        return sendError(res, 500, "Unable to assign delivery boy");
+    }
+};
+
+// =====================================================
+// GET ASSIGNED ORDERS FOR DELIVERY BOY
+// GET /api/delivery/my-orders
+// =====================================================
+
+const getMyDeliveryOrders = async (req, res) => {
+    try {
+        if (req.user?.role !== "delivery_boy") {
+            return sendError(res, 403, "Delivery boy access required");
+        }
+
+        const orders = await RestaurantOrder.find({
+  deliveryBoy: req.user._id,
+  orderType: "delivery",
+  orderStatus: { $in: ["ready", "out_for_delivery"] },
+})
+  .populate("customer", "name phone")
+  .populate("deliveryBoy", "name phone")
+  .populate("items.food", "name price")
+  .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            count: orders.length,
+            orders,
+        });
+    } catch (error) {
+        console.error("Get Delivery Orders Error:", error);
+        return sendError(res, 500, "Unable to fetch assigned orders");
+    }
+};
+
+// =====================================================
+// VERIFY DELIVERY OTP
+// POST /api/delivery/:id/verify-otp
+// =====================================================
+
+const verifyDeliveryOtp = async (req, res) => {
+    try {
+        if (req.user?.role !== "delivery_boy") {
+            return sendError(res, 403, "Delivery boy access required");
+        }
+
+        const { id } = req.params;
+        const otp = String(req.body?.otp || "").trim();
+
+        if (!isValidId(id)) {
+            return sendError(res, 400, "Invalid order ID");
+        }
+
+        if (!/^\d{4}$/.test(otp)) {
+            return sendError(res, 400, "Enter a valid 4-digit OTP");
+        }
+
+        // Atomically increment attempts to reduce concurrent brute-force attempts.
+        const order = await RestaurantOrder.findOneAndUpdate(
+            {
+                _id: id,
+                deliveryBoy: req.user._id,
+                orderType: "delivery",
+                orderStatus: { $in: ["ready", "out_for_delivery"] },
+                deliveryOtpVerifiedAt: null,
+                deliveryOtpExpiresAt: { $gt: new Date() },
+                deliveryOtpAttempts: { $lt: MAX_OTP_ATTEMPTS },
+            },
+            { $inc: { deliveryOtpAttempts: 1 } },
+            { new: true }
+        ).select("+deliveryOtpEncrypted");
+
+        if (!order) {
+            return sendError(
+                res,
+                400,
+                "Order is not assigned to you, OTP expired, or attempts exceeded"
+            );
+        }
+
+        if (!order.deliveryOtpEncrypted) {
+            return sendError(res, 400, "Delivery OTP is unavailable");
+        }
+
+        const correctOtp = decryptDeliveryOtp(
+            order.deliveryOtpEncrypted
+        );
+
+        const otpMatches = crypto.timingSafeEqual(
+            Buffer.from(otp),
+            Buffer.from(correctOtp)
+        );
+
+        if (!otpMatches) {
+            return sendError(res, 400, "Incorrect OTP");
+        }
+
+        order.deliveryOtpVerifiedAt = new Date();
+        order.orderStatus = "delivered";
+        order.deliveredAt = new Date();
+
+        // Remove the encrypted OTP after successful verification.
+        order.deliveryOtpEncrypted = null;
+        await order.save();
+
+        const customer = order.customer
+            ? await User.findById(order.customer).select("name email phone")
+            : null;
+
+        let emailSent = false;
+
+        if (customer?.email) {
+            try {
+                await sendDeliveryConfirmationEmail(order, customer);
+                emailSent = true;
+            } catch (emailError) {
+                console.error(
+                    "Delivery confirmation email failed:",
+                    emailError.message
+                );
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "OTP verified. Order marked as delivered.",
+            emailSent,
+            orderId: order._id,
+            orderStatus: order.orderStatus,
+            deliveredAt: order.deliveredAt,
+        });
+    } catch (error) {
+        console.error("Verify Delivery OTP Error:", error);
+        return sendError(res, 500, "Unable to verify delivery OTP");
     }
 };
 
@@ -1188,4 +1451,9 @@ module.exports = {
     updateRestaurantOrderStatus,
     updateRestaurantOrderPayment,
     removeRestaurantOrderItem,
+
+    assignDeliveryBoy,
+    getMyDeliveryOrders,
+    verifyDeliveryOtp,
 };
+

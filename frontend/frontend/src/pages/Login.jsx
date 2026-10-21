@@ -1,194 +1,191 @@
 
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { loginUser } from "../services/authService";
-import { Link } from "react-router-dom";
 
 const Login = ({ onLogin }) => {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
-    // Normalize role and select the correct dashboard
-    const getDashboardPath = (role) => {
-        const normalizedRole = String(role || "")
-            .trim()
-            .toLowerCase()
-            .replace(/[\s-]+/g, "_");
+  // Normalize role names from the backend
+  const normalizeRole = (role) =>
+    String(role || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_");
 
-        const dashboardPaths = {
-            admin: "/admin",
-            manager: "/admin",
-            receptionist: "/admin/billing",
-            waiter: "/waiter",
-            kitchen: "/kitchen",
-            customer: "/rooms",
-            user: "/rooms",
-        };
-
-        return dashboardPaths[normalizedRole] || "/rooms";
+  // Select dashboard according to role
+  const getDashboardPath = (role) => {
+    const paths = {
+      admin: "/admin",
+      manager: "/admin",
+      receptionist: "/admin/billing",
+      waiter: "/waiter",
+      kitchen: "/kitchen",
+      accountant: "/admin",
+      hr: "/admin",
+      delivery_boy: "/delivery/delivery-dashboard",
+      customer: "/rooms",
+      user: "/rooms",
     };
 
-    // Login handler
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError("");
+    return paths[normalizeRole(role)] || "/rooms";
+  };
 
-        if (!email.trim() || !password) {
-            setError("Email and password are required.");
-            return;
-        }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
 
-        setLoading(true);
+    if (!email.trim() || !password) {
+      setError("Email and password are required.");
+      return;
+    }
 
-        try {
-            const response = await loginUser(
-                email.trim(),
-                password
-            );
+    setLoading(true);
 
-            console.log("Login Response:", response);
+    try {
+      const response = await loginUser(
+        email.trim(),
+        password
+      );
 
-            if (
-                !response?.success ||
-                !response?.token ||
-                !response?.user
-            ) {
-                setError(
-                    response?.message || "Login failed."
-                );
-                return;
-            }
+      console.log("Login response:", response);
 
-            const user = response.user;
+      // Support common response structures
+      const payload = response?.data || response;
+      const user = payload?.user || payload?.data?.user;
+      const token =
+        payload?.token ||
+        payload?.accessToken ||
+        payload?.data?.token;
 
-            console.log("Logged-in user:", user);
-            console.log("Logged-in role:", user.role);
+      if (!user || !token) {
+        setError(
+          payload?.message ||
+            "Login response mein user ya token nahi mila."
+        );
+        return;
+      }
 
-            // Save authentication information
-            localStorage.setItem("token", response.token);
-            localStorage.setItem(
-                "user",
-                JSON.stringify(user)
-            );
+      const role = normalizeRole(user.role);
 
-            // Update App login state
-            if (onLogin) {
-                onLogin(user);
-            }
+      console.log("Logged-in user:", user);
+      console.log("Normalized role:", role);
 
-            // Navigate to the correct dashboard
-            const dashboardPath = getDashboardPath(user.role);
+      // Save login information
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
 
-            console.log("Redirecting to:", dashboardPath);
+      // Update global login state
+      if (onLogin) {
+        onLogin(user);
+      }
 
-            navigate(dashboardPath, {
-                replace: true,
-            });
-        } catch (error) {
-            console.error("Login Error:", error);
+      // Redirect according to role
+      const dashboardPath = getDashboardPath(role);
 
-            setError(
-                error.response?.data?.message ||
-                "Unable to login. Please check the server."
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
+      console.log("Redirecting to:", dashboardPath);
 
-    return (
-        <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
-            <div className="bg-white shadow-xl rounded-xl p-8 w-full max-w-md">
-                <h1 className="text-3xl font-bold text-center mb-2">
-                    Hotel & Restaurant
-                </h1>
+      navigate(dashboardPath, { replace: true });
+    } catch (err) {
+      console.error("Login error:", err);
 
-                <p className="text-center text-gray-500 mb-8">
-                    Login to Your Account
-                </p>
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          "Unable to login. Please check your credentials and server."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-                <form
-                    onSubmit={handleSubmit}
-                    className="space-y-5"
-                >
-                    {/* EMAIL */}
-                    <div>
-                        <label
-                            htmlFor="login-email"
-                            className="block mb-2 font-medium"
-                        >
-                            Email
-                        </label>
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 p-6">
+      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-xl">
+        <h1 className="mb-2 text-center text-3xl font-bold text-gray-900">
+          Hotel &amp; Restaurant
+        </h1>
 
-                        <input
-                            id="login-email"
-                            type="email"
-                            value={email}
-                            onChange={(e) =>
-                                setEmail(e.target.value)
-                            }
-                            placeholder="Enter your email"
-                            autoComplete="email"
-                            required
-                            className="w-full border rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
+        <p className="mb-8 text-center text-gray-500">
+          Login to Your Account
+        </p>
 
-                    {/* PASSWORD */}
-                    <div>
-                        <label
-                            htmlFor="login-password"
-                            className="block mb-2 font-medium"
-                        >
-                            Password
-                        </label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label
+              htmlFor="login-email"
+              className="mb-2 block font-medium text-gray-700"
+            >
+              Email
+            </label>
 
-                        <input
-                            id="login-password"
-                            type="password"
-                            value={password}
-                            onChange={(e) =>
-                                setPassword(e.target.value)
-                            }
-                            placeholder="Enter your password"
-                            autoComplete="current-password"
-                            required
-                            className="w-full border rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
+            <input
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
+              autoComplete="email"
+              required
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
-                    {/* ERROR */}
-                    {error && (
-                        <div
-                            role="alert"
-                            className="bg-red-100 text-red-700 p-3 rounded-lg text-sm"
-                        >
-                            {error}
-                        </div>
-                    )}
+          <div>
+            <label
+              htmlFor="login-password"
+              className="mb-2 block font-medium text-gray-700"
+            >
+              Password
+            </label>
 
-                    {/* LOGIN BUTTON */}
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg disabled:opacity-50"
-                    >
-                        {loading
-                            ? "Logging in..."
-                            : "Login"}
-                    </button>
-                    <p className="signup-login-link">
-    Don't have an account?{" "}
-    <Link to="/signup">Sign Up</Link>
-</p>
-                </form>
+            <input
+              id="login-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              autoComplete="current-password"
+              required
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {error && (
+            <div
+              role="alert"
+              className="rounded-lg bg-red-100 p-3 text-sm text-red-700"
+            >
+              {error}
             </div>
-        </div>
-    );
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Logging in..." : "Login"}
+          </button>
+
+          <p className="text-center text-sm text-gray-600">
+            Don't have an account?{" "}
+            <Link
+              to="/signup"
+              className="font-semibold text-blue-600 hover:text-blue-800"
+            >
+              Sign Up
+            </Link>
+          </p>
+        </form>
+      </div>
+    </div>
+  );
 };
 
 export default Login;
