@@ -133,6 +133,7 @@ app.use(
     "/api/restaurant-bills",
     restaurantBillRoutes
 );
+app.use("/api/restaurant-orders", restaurantOrderRoutes);
 app.use("/api/restaurant-payments", restaurantPaymentRoutes);
 // ADMIN ROUTES
 app.use("/api/admin", adminRoutes);

@@ -20,6 +20,7 @@ const {
     updateRestaurantOrderPayment,
     removeRestaurantOrderItem,
     assignDeliveryBoy,
+    getRestaurantOrderHistory,
     getMyDeliveryOrders,
     verifyDeliveryOtp,
 } = restaurantOrderController;
@@ -72,7 +73,13 @@ router.get(
     getTableOrders
 );
 
+router.get(
+    "/history",
+    protect,
+    getRestaurantOrderHistory
+);
 
+router.get("/", protect, getAllRestaurantOrders);
 // ========================================
 // ADD MORE ITEMS TO EXISTING ORDER
 // Waiter, Admin and Manager

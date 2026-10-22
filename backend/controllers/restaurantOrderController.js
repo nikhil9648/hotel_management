@@ -639,6 +639,43 @@ discountAmount,
 // Customer sees OTP only for their own delivery orders.
 // =====================================================
 
+// GET /api/restaurant-orders/history
+const getRestaurantOrderHistory = async (req, res) => {
+    try {
+        if (
+            !["admin", "manager", "accountant"].includes(
+                req.user?.role
+            )
+        ) {
+            return sendError(
+                res,
+                403,
+                "Not allowed to view order history"
+            );
+        }
+
+        const orders = await populateOrder(
+            RestaurantOrder.find({}).sort({
+                createdAt: -1,
+            })
+        );
+
+        return res.status(200).json({
+            success: true,
+            count: orders.length,
+            orders,
+        });
+    } catch (error) {
+        console.error("Get Restaurant Order History Error:", error);
+
+        return sendError(
+            res,
+            500,
+            "Unable to fetch restaurant order history"
+        );
+    }
+};
+
 const getMyRestaurantOrders = async (req, res) => {
     try {
         const role = req.user?.role;
@@ -1451,6 +1488,7 @@ module.exports = {
     updateRestaurantOrderStatus,
     updateRestaurantOrderPayment,
     removeRestaurantOrderItem,
+    getRestaurantOrderHistory,
 
     assignDeliveryBoy,
     getMyDeliveryOrders,

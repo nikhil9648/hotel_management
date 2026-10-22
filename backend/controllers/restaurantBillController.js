@@ -63,6 +63,7 @@ const calculateCouponDiscount = (coupon, subtotal) => {
 // POST /api/restaurant-bills/table/:tableId
 // ==========================================
 
+
 const createRestaurantBill = async (req, res) => {
     try {
         const {
@@ -77,7 +78,13 @@ const createRestaurantBill = async (req, res) => {
 
         let orders = [];
 
-        // Find orders by IDs.
+        // Find only current, unbilled orders.
+        const orderFilter = {
+            billGenerated: { $ne: true },
+            paymentStatus: { $ne: "paid" },
+            orderStatus: { $nin: ["cancelled", "canceled"] },
+        };
+
         if (Array.isArray(orderIds) && orderIds.length > 0) {
             for (const id of orderIds) {
                 if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -89,9 +96,8 @@ const createRestaurantBill = async (req, res) => {
             }
 
             orders = await RestaurantOrder.find({
+                ...orderFilter,
                 _id: { $in: orderIds },
-                paymentStatus: { $ne: "paid" },
-                orderStatus: { $ne: "cancelled" },
             });
         } else if (tableId) {
             if (!mongoose.Types.ObjectId.isValid(tableId)) {
@@ -102,9 +108,8 @@ const createRestaurantBill = async (req, res) => {
             }
 
             orders = await RestaurantOrder.find({
+                ...orderFilter,
                 table: tableId,
-                paymentStatus: { $ne: "paid" },
-                orderStatus: { $ne: "cancelled" },
             });
         } else {
             return res.status(400).json({
@@ -116,17 +121,17 @@ const createRestaurantBill = async (req, res) => {
         if (orders.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: "No unpaid restaurant orders found.",
+                message: "No new unbilled restaurant orders found for this table.",
             });
         }
 
-        // All selected orders must belong to one table.
+        // All orders must belong to the same table.
         const selectedTableId = orders[0].table;
 
         if (!selectedTableId) {
             return res.status(400).json({
                 success: false,
-                message: "Order is not linked with a table.",
+                message: "An order is not linked with a table.",
             });
         }
 
@@ -138,11 +143,10 @@ const createRestaurantBill = async (req, res) => {
         if (differentTable) {
             return res.status(400).json({
                 success: false,
-                message: "All orders must belong to the same table.",
+                message: "All selected orders must belong to the same table.",
             });
         }
 
-        // For the table endpoint, ensure the requested table matches.
         if (
             tableId &&
             String(selectedTableId) !== String(tableId)
@@ -162,30 +166,9 @@ const createRestaurantBill = async (req, res) => {
             });
         }
 
-        // Prevent a second bill for a table that already has an open bill.
-        const existingBill = await RestaurantBill.findOne({
-            table: selectedTableId,
-            status: "open",
-        });
-
-        if (existingBill) {
-    // Orders already included in this bill should not remain
-    // in the kitchen queue.
-    await RestaurantOrder.updateMany(
-        { _id: { $in: existingBill.orders } },
-        { $set: { billGenerated: true } }
-    );
-
-    return res.status(200).json({
-        success: true,
-        message: "An open bill already exists for this table.",
-        bill: existingBill,
-    });
-}
-
-        // Calculate subtotal from the actual orders.
         const selectedOrderIds = orders.map((order) => order._id);
 
+        // Calculate the subtotal from saved order data.
         const subtotal = roundMoney(
             orders.reduce(
                 (sum, order) => sum + Number(order.subtotal || 0),
@@ -193,29 +176,34 @@ const createRestaurantBill = async (req, res) => {
             )
         );
 
-        // ==========================================
-// GET CUSTOMER DETAILS FROM WAITER'S ORDER
-// ==========================================
+        if (subtotal <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Cannot generate a bill with a zero subtotal.",
+            });
+        }
 
-const customerOrder = orders.find(
-    (order) =>
-        order.customerName?.trim() ||
-        order.customerPhone?.trim()
-);
+        const customerOrder = orders.find(
+            (order) =>
+                order.customerName?.trim() ||
+                order.customerMobile?.trim() ||
+                order.customerPhone?.trim()
+        );
 
-const finalCustomerName =
-    customerOrder?.customerName?.trim() ||
-    String(customerName || "").trim() ||
-    "Walk-in Customer";
+        const finalCustomerName =
+            customerOrder?.customerName?.trim() ||
+            String(customerName || "").trim() ||
+            "Walk-in Customer";
 
-const finalCustomerPhone =
-    customerOrder?.customerPhone?.trim() ||
-    String(customerPhone || "").trim() ||
-    "";
+        const finalCustomerPhone =
+            customerOrder?.customerMobile?.trim() ||
+            customerOrder?.customerPhone?.trim() ||
+            String(customerPhone || "").trim() ||
+            "";
 
         const taxAmount = roundMoney(subtotal * TAX_RATE);
 
-        // Validate coupon on the server.
+        // Always validate coupons on the server.
         let discount = 0;
         let savedCouponCode = "";
 
@@ -237,10 +225,7 @@ const finalCustomerPhone =
             }
 
             try {
-                discount = calculateCouponDiscount(
-                    coupon,
-                    subtotal
-                );
+                discount = calculateCouponDiscount(coupon, subtotal);
             } catch (couponError) {
                 return res.status(400).json({
                     success: false,
@@ -249,37 +234,33 @@ const finalCustomerPhone =
             }
 
             savedCouponCode = coupon.code;
-        } else {
-            // Never trust a discount supplied by the browser.
-            // A coupon code is required for coupon-based discounts.
-            if (Number(discountAmount) > 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: "A valid coupon code is required for a discount.",
-                });
-            }
+        } else if (Number(discountAmount) > 0) {
+            return res.status(400).json({
+                success: false,
+                message: "A valid coupon code is required for a discount.",
+            });
         }
 
         const totalAmount = roundMoney(
             Math.max(0, subtotal + taxAmount - discount)
         );
 
-        const billNumber = `RB-${Date.now()}`;
+        const billNumber =
+            `RB-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
+        // Do not block a new bill just because an older bill exists.
+        // Previously billed orders are excluded by billGenerated above.
         const bill = await RestaurantBill.create({
             billNumber,
             table: selectedTableId,
             orders: selectedOrderIds,
-
             customerName: finalCustomerName,
-customerPhone: finalCustomerPhone,
-
+            customerPhone: finalCustomerPhone,
             subtotal,
             taxAmount,
             discountAmount: discount,
             couponCode: savedCouponCode,
             totalAmount,
-
             paidAmount: 0,
             paymentStatus: "unpaid",
             paymentMethod: "pending",
@@ -287,12 +268,11 @@ customerPhone: finalCustomerPhone,
             paidAt: null,
         });
 
-        // Hide billed orders from the kitchen queue immediately.
-// Payment is not required for this change.
-await RestaurantOrder.updateMany(
-    { _id: { $in: selectedOrderIds } },
-    { $set: { billGenerated: true } }
-);
+        // Mark only the orders included in this bill.
+        await RestaurantOrder.updateMany(
+            { _id: { $in: selectedOrderIds } },
+            { $set: { billGenerated: true } }
+        );
 
         const populatedBill = await RestaurantBill.findById(bill._id)
             .populate("table", "tableNumber capacity status")
@@ -316,6 +296,7 @@ await RestaurantOrder.updateMany(
         });
     }
 };
+
 
 // ==========================================
 // GET BILL BY ID
@@ -408,6 +389,7 @@ const payRestaurantBill = async (req, res) => {
                 $set: {
                     paymentStatus: "paid",
                     paymentMethod,
+                    orderStatus: "completed",
                 },
             }
         );
