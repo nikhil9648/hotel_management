@@ -75,6 +75,17 @@ const userSchema = new mongoose.Schema(
         type: String,
         default: "India",
       },
+      location: {
+  type: {
+    type: String,
+    enum: ["Point"],
+    default: "Point",
+  },
+  coordinates: {
+    type: [Number], // [longitude, latitude]
+    default: undefined,
+  },
+},
     },
 
     isActive: {

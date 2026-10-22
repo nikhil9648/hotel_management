@@ -6,6 +6,9 @@ const RestaurantTable = require("../models/RestaurantTable");
 const FoodItem = require("../models/FoodItem");
 const User = require("../models/User");
 const Coupon = require("../models/Coupon");
+const {
+    isDeliveryAvailable,
+} = require("../utils/deliveryLocation");
 
 const transporter = require("../config/mailer");
 const generateRestaurantInvoice = require("../utils/generateRestaurantInvoice");
@@ -334,6 +337,7 @@ const createRestaurantOrder = async (req, res) => {
             items,
             orderType,
             deliveryAddress = "",
+            deliveryLocation = null,
             paymentMethod = "cash",
             notes = "",
             parentOrder,
@@ -417,6 +421,45 @@ const createRestaurantOrder = async (req, res) => {
             (table || tableNumber || hasDineInItems
                 ? "dine-in"
                 : "takeaway");
+
+        if (resolvedOrderType === "delivery") {
+    if (!String(deliveryAddress || "").trim()) {
+        return sendError(
+            res,
+            400,
+            "Delivery address is required"
+        );
+    }
+
+    const coordinates = deliveryLocation?.coordinates;
+
+    if (
+        deliveryLocation?.type !== "Point" ||
+        !Array.isArray(coordinates) ||
+        coordinates.length !== 2 ||
+        !coordinates.every(
+            (value) =>
+                typeof value === "number" &&
+                Number.isFinite(value)
+        ) ||
+        Math.abs(coordinates[0]) > 180 ||
+        Math.abs(coordinates[1]) > 90
+    ) {
+        return sendError(
+            res,
+            400,
+            "Please select a valid delivery location"
+        );
+    }
+
+    if (!isDeliveryAvailable(deliveryLocation)) {
+        return sendError(
+            res,
+            400,
+            "Online delivery facility is not available in your location"
+        );
+    }
+}
 
         if (
             resolvedOrderType === "delivery" &&

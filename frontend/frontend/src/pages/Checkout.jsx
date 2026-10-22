@@ -75,6 +75,7 @@ export default function Checkout() {
   const [user, setUser] = useState(null);
 
   const [address, setAddress] = useState(emptyAddress);
+  const [deliveryLocation, setDeliveryLocation] = useState(null);
   const [savedAddress, setSavedAddress] = useState(false);
   const [showAddressForm, setShowAddressForm] = useState(true);
 
@@ -204,6 +205,7 @@ export default function Checkout() {
     }));
 
     setSavedAddress(false);
+    setDeliveryLocation(null);
   };
 
   const validateAddress = () => {
@@ -274,6 +276,10 @@ export default function Checkout() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
+          setDeliveryLocation({
+  type: "Point",
+  coordinates: [longitude, latitude],
+});
 
           const response = await axios.get(
             "https://nominatim.openstreetmap.org/reverse",
@@ -456,7 +462,17 @@ export default function Checkout() {
       );
       return;
     }
-
+if (
+  !deliveryLocation ||
+  deliveryLocation.type !== "Point" ||
+  !Array.isArray(deliveryLocation.coordinates) ||
+  deliveryLocation.coordinates.length !== 2
+) {
+  setError(
+    "Please select your current delivery location to check delivery availability."
+  );
+  return;
+}
     setLoading(true);
 
     let createdOrderId = null;
@@ -483,6 +499,7 @@ export default function Checkout() {
         ]
           .filter(Boolean)
           .join(", "),
+        deliveryLocation: deliveryLocation,
         customerName: user.name,
         customerMobile: user.phone || user.mobile,
         paymentMethod: "razorpay",
