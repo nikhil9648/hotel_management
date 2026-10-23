@@ -1,297 +1,38 @@
-import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ArrowLeft, ArrowRight, BedDouble, CalendarDays, Check, Clock3, Users, UtensilsCrossed } from "lucide-react";
 import PayNow from "../components/PayNow";
+import "../styles/CustomerExperience.css";
 
-const BookingDetails = () => {
+const formatDate = (value) => value ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "—";
+const humanize = (value) => String(value || "Pending").replace(/[_-]/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+export default function BookingDetails() {
     const location = useLocation();
     const navigate = useNavigate();
-
     const booking = location.state?.booking;
 
-    if (!booking) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-100">
-                <div className="bg-white p-8 rounded-xl shadow text-center">
-
-                    <h2 className="text-xl font-bold text-red-600">
-                        Booking not found
-                    </h2>
-
-                    <button
-                        onClick={() => navigate("/rooms")}
-                        className="mt-5 bg-blue-600 text-white px-6 py-3 rounded-lg"
-                    >
-                        Book a Room
-                    </button>
-
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="min-h-screen bg-gray-100 p-6">
-
-            <div className="max-w-3xl mx-auto">
-
-                <div className="bg-white rounded-xl shadow p-8">
-
-                    {/* SUCCESS */}
-
-                    <div className="text-center mb-8">
-
-                        <div className="text-5xl mb-3">
-                            ✅
-                        </div>
-
-                        <h1 className="text-3xl font-bold text-green-600">
-                            Booking Created Successfully
-                        </h1>
-
-                        <p className="text-gray-600 mt-2">
-                            Your room has been reserved.
-                        </p>
-
-                    </div>
-
-
-                    {/* BOOKING NUMBER */}
-
-                    <div className="bg-gray-100 rounded-lg p-5 text-center mb-6">
-
-                        <p className="text-gray-500">
-                            Booking Number
-                        </p>
-
-                        <p className="text-2xl font-bold mt-1">
-                            {booking.bookingNumber}
-                        </p>
-
-                    </div>
-
-
-                    {/* DETAILS */}
-
-                    <div className="space-y-4">
-
-                        <div className="flex justify-between border-b pb-3">
-                            <span className="text-gray-600">
-                                Room
-                            </span>
-
-                            <strong>
-                                Room {booking.room?.roomNumber}
-                            </strong>
-                        </div>
-
-
-                        <div className="flex justify-between border-b pb-3">
-                            <span className="text-gray-600">
-                                Floor
-                            </span>
-
-                            <strong>
-                                {booking.room?.floor}
-                            </strong>
-                        </div>
-
-
-                        <div className="flex justify-between border-b pb-3">
-                            <span className="text-gray-600">
-                                Check-in
-                            </span>
-
-                            <strong>
-                                {new Date(
-                                    booking.checkInDate
-                                ).toLocaleDateString("en-IN")}
-                            </strong>
-                        </div>
-
-
-                        <div className="flex justify-between border-b pb-3">
-                            <span className="text-gray-600">
-                                Check-out
-                            </span>
-
-                            <strong>
-                                {new Date(
-                                    booking.checkOutDate
-                                ).toLocaleDateString("en-IN")}
-                            </strong>
-                        </div>
-
-
-                        <div className="flex justify-between border-b pb-3">
-                            <span className="text-gray-600">
-                                Guests
-                            </span>
-
-                            <strong>
-                                {booking.adults} Adult(s)
-                                {" + "}
-                                {booking.children} Child(ren)
-                            </strong>
-                        </div>
-
-
-                        <div className="flex justify-between border-b pb-3">
-                            <span className="text-gray-600">
-                                Nights
-                            </span>
-
-                            <strong>
-                                {booking.numberOfNights}
-                            </strong>
-                        </div>
-
-
-                        <div className="flex justify-between border-b pb-3">
-                            <span className="text-gray-600">
-                                Room Charges
-                            </span>
-
-                            <strong>
-                                ₹{booking.roomCharges}
-                            </strong>
-                        </div>
-
-
-                        <div className="flex justify-between border-b pb-3">
-                            <span className="text-gray-600">
-                                Tax
-                            </span>
-
-                            <strong>
-                                ₹{booking.taxAmount}
-                            </strong>
-                        </div>
-
-
-                        <div className="flex justify-between text-xl pt-2">
-
-                            <span className="font-bold">
-                                Total Amount
-                            </span>
-
-                            <strong className="text-green-600">
-                                ₹{booking.totalAmount}
-                            </strong>
-
-                        </div>
-
-                    </div>
-
-
-                    {/* STATUS */}
-
-                    <div className="grid grid-cols-2 gap-4 mt-7">
-
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-
-                            <p className="text-sm text-gray-500">
-                                Booking Status
-                            </p>
-
-                            <p className="font-bold text-yellow-700 capitalize">
-                                {booking.bookingStatus}
-                            </p>
-
-                        </div>
-
-
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-
-                            <p className="text-sm text-gray-500">
-                                Payment Status
-                            </p>
-
-                            <p className="font-bold text-yellow-700 capitalize">
-                                {booking.paymentStatus}
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    {/* PAYMENT */}
-
-                    {booking.paymentStatus === "pending" && (
-
-                        <div className="mt-8 text-center">
-
-                            <h2 className="text-xl font-bold mb-2">
-                                Complete Your Payment
-                            </h2>
-
-                            <p className="text-gray-600 mb-4">
-                                Pay ₹{booking.totalAmount} to confirm your booking.
-                            </p>
-
-                            <PayNow
-                                bookingId={booking._id}
-                                onPaymentSuccess={(data) => {
-
-                                    navigate("/payment-success", {
-                                        state: {
-                                            booking:
-                                                data.booking,
-
-                                            payment:
-                                                data.payment,
-                                        },
-                                    });
-
-                                }}
-                            />
-
-                        </div>
-
-                    )}
-
-
-                    {/* ALREADY PAID */}
-
-                    {booking.paymentStatus === "paid" && (
-
-                        <div className="mt-8 bg-green-100 text-green-700 p-4 rounded-lg text-center font-semibold">
-                            Payment Completed ✓
-                        </div>
-
-                    )}
-
-
-                    {/* BUTTONS */}
-
-                    <div className="flex gap-3 mt-8">
-
-                        <button
-                            onClick={() =>
-                                navigate("/my-bookings")
-                            }
-                            className="flex-1 border border-gray-300 py-3 rounded-lg"
-                        >
-                            My Bookings
-                        </button>
-
-                        <button
-                            onClick={() =>
-                                navigate("/rooms")
-                            }
-                            className="flex-1 bg-blue-600 text-white py-3 rounded-lg"
-                        >
-                            Book Another Room
-                        </button>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </div>
-    );
-};
-
-export default BookingDetails;
+    const header = <header className="cx-topbar cx-record-topbar"><Link to="/" className="cx-brand"><span className="cx-brand-mark"><UtensilsCrossed size={19} /></span><span>MAURYA<span className="cx-brand-sub">KITCHEN & STAYS</span></span></Link><nav><Link to="/">Home</Link><Link to="/menu">Menu</Link><Link to="/rooms">Rooms</Link><Link to="/contact">Contact us</Link><Link to="/my-bookings">My bookings</Link></nav><Link to="/profile" className="cx-record-profile">My account <ArrowRight size={15} /></Link></header>;
+
+    if (!booking) return <main className="cx-page cx-confirm-page">{header}<div className="cx-state-card cx-confirm-missing"><span className="cx-empty-icon"><BedDouble size={25} /></span><h3>Booking details aren’t available</h3><p>Choose your dates and room again to start a reservation.</p><Link to="/rooms" className="cx-button cx-button-orange">Find a room <ArrowRight size={16} /></Link></div></main>;
+
+    const paymentPending = String(booking.paymentStatus).toLowerCase() === "pending";
+    const paymentPaid = String(booking.paymentStatus).toLowerCase() === "paid";
+    const rows = [
+        ["Room", `Room ${booking.room?.roomNumber || "—"}${booking.room?.roomType?.name ? ` · ${booking.room.roomType.name}` : ""}`],
+        ["Floor", booking.room?.floor ?? "—"],
+        ["Check-in", formatDate(booking.checkInDate)],
+        ["Check-out", formatDate(booking.checkOutDate)],
+        ["Guests", `${booking.adults || 1} adult(s)${booking.children ? ` · ${booking.children} child(ren)` : ""}`],
+        ["Stay length", `${booking.numberOfNights || 0} night(s)`],
+    ];
+
+    return <main className="cx-page cx-confirm-page">
+        {header}
+        <section className="cx-confirm-hero"><span className="cx-confirm-check"><Check size={28} /></span><span className="cx-kicker cx-kicker-light">YOUR STAY IS RESERVED</span><h1>One lovely stay<br /><em>to look forward to.</em></h1><p>Your room reservation has been created. Keep this booking number handy.</p></section>
+        <section className="cx-confirm-layout">
+            <article className="cx-confirm-main-card"><div className="cx-confirm-booking-number"><span><small>BOOKING NUMBER</small><b>{booking.bookingNumber || "Reservation confirmed"}</b></span><span className="cx-status-pill confirmed">{humanize(booking.bookingStatus)}</span></div><div className="cx-confirm-row-grid">{rows.map(([label, value], index) => <div className="cx-confirm-row" key={label}><span className="cx-confirm-row-icon">{index === 0 ? <BedDouble size={17} /> : index < 4 ? <CalendarDays size={17} /> : <Users size={17} />}</span><span><small>{label.toUpperCase()}</small><b>{value}</b></span></div>)}</div><div className="cx-confirm-total"><span><small>ROOM CHARGES</small><b>₹{Number(booking.roomCharges || 0).toLocaleString("en-IN")}</b></span><span><small>TAX</small><b>₹{Number(booking.taxAmount || 0).toLocaleString("en-IN")}</b></span><span className="grand"><small>TOTAL AMOUNT</small><b>₹{Number(booking.totalAmount || 0).toLocaleString("en-IN")}</b></span></div></article>
+            <aside className="cx-confirm-side"><span className="cx-kicker">PAYMENT & NEXT STEPS</span><h2>Almost all set.</h2><div className="cx-confirm-status"><small>PAYMENT STATUS</small><span className={`cx-status-pill ${paymentPaid ? "paid" : "pending"}`}>{humanize(booking.paymentStatus)}</span></div>{paymentPending && <div className="cx-confirm-pay"><p>Complete your payment of <b>₹{Number(booking.totalAmount || 0).toLocaleString("en-IN")}</b> to finish your reservation.</p><PayNow bookingId={booking._id} onPaymentSuccess={(data) => navigate("/payment-success", { state: { booking: data.booking, payment: data.payment } })} /></div>}{paymentPaid && <div className="cx-paid-banner"><Check size={17} /> Payment completed. Thank you!</div>}<div className="cx-confirm-tip"><Clock3 size={16} /><span>Your booking details are saved in <b>My bookings</b>.</span></div><Link to="/my-bookings" className="cx-confirm-text-link">View my bookings <ArrowRight size={15} /></Link></aside>
+        </section>
+        <div className="cx-confirm-bottom-actions"><button onClick={() => navigate("/rooms")} className="cx-button cx-button-outline"><ArrowLeft size={16} /> Back to rooms</button><Link to="/menu" className="cx-button cx-button-orange">Explore dining <ArrowRight size={16} /></Link></div>
+    </main>;
+}

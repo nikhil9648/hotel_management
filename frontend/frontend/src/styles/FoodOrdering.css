@@ -323,6 +323,13 @@
 .ordering-home .food-category-art,.ordering-home .category-all-art { color:#765d3e; background:#f1ecdf; }
 .ordering-home .category-all-art { color:#fff; background:linear-gradient(140deg,#c8a46b,#718560); }
 .ordering-home .food-product-card:hover { border-color:#d8c6a6; }
-.ordering-home .food-room-promo { background:linear-gradient(125deg,#f0ede3,#f8f5ec); }
-.ordering-home .food-room-promo .food-section-kicker { color:#846136; }
-.ordering-home .food-room-promo .promo-spark { color:#8d7047; background:#e9e0cf; }
+.ordering-home .food-room-promo { color:#fff; background:linear-gradient(120deg,#20392d,#354b38 68%,#4b5940); }
+.ordering-home .food-room-promo h2 { color:#fff; }
+.ordering-home .food-room-promo .food-section-kicker { color:#e2c99d; }
+.ordering-home .food-room-promo .promo-spark { color:#e2c99d; }
+
+/* Checkout CTA was rendered as a white inline link on a white summary card. */
+.order-primary-button { display:flex; align-items:center; justify-content:center; gap:10px; min-height:48px; width:max-content; padding:0 18px; border:0; border-radius:12px; color:#fff!important; background:#294638; box-shadow:0 9px 22px #1d392b24; font-size:12px; font-weight:800; text-decoration:none; transition:transform .18s ease,background .18s ease,box-shadow .18s ease; }
+.order-primary-button:hover { transform:translateY(-2px); color:#fff!important; background:#1c372a; box-shadow:0 13px 28px #1d392b35; }
+.checkout-link { display:flex; width:100%; min-height:50px; margin-top:14px; }
+.empty-basket-card .order-primary-button { min-height:48px; }
