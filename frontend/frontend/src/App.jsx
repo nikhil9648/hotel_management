@@ -299,53 +299,6 @@ function App() {
                         : "app-content"
                 }
             >
-                {/* Customer Welcome Banner */}
-                {isLoggedIn &&
-                    isCustomer &&
-                    location.pathname === "/rooms" && (
-                        <section
-                            className="customer-welcome"
-                            aria-labelledby="customer-welcome-title"
-                        >
-                            <div className="customer-welcome-copy">
-                                <p className="customer-eyebrow">
-                                    <span />
-                                    A MORE THOUGHTFUL WAY TO STAY
-                                </p>
-
-                                <h1 id="customer-welcome-title">
-                                    Make room for{" "}
-                                    <em>something wonderful.</em>
-                                </h1>
-
-                                <p>
-                                    Your dates, your pace, and a little more
-                                    room to enjoy the journey.
-                                </p>
-                            </div>
-
-                            <div
-                                className="welcome-orbit"
-                                aria-hidden="true"
-                            >
-                                <span className="orbit orbit-one" />
-                                <span className="orbit orbit-two" />
-
-                                <span className="orbit-core">
-                                    <svg viewBox="0 0 48 48" fill="none">
-                                        <path
-                                            d="M8 30V18l16-9 16 9v12M12 28h24M16 28v10m16-10v10M9 38h30"
-                                            stroke="currentColor"
-                                            strokeWidth="1.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        />
-                                    </svg>
-                                </span>
-                            </div>
-                        </section>
-                    )}
-
                 <Routes>
                     {/* Public Homepage */}
                     <Route

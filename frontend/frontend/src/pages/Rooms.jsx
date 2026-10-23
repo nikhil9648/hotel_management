@@ -1,231 +1,51 @@
 import { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, ArrowRight, BedDouble, CalendarDays, Check, MapPin, RefreshCw, Search, Users, Wifi } from "lucide-react";
+import "../styles/CustomerExperience.css";
 
 const Rooms = () => {
     const navigate = useNavigate();
-
     const [checkInDate, setCheckInDate] = useState("");
     const [checkOutDate, setCheckOutDate] = useState("");
-
     const [rooms, setRooms] = useState([]);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
+    const [hasSearched, setHasSearched] = useState(false);
 
-    const searchRooms = async () => {
+    const searchRooms = async (event) => {
+        event?.preventDefault(); setMessage("");
+        if (!checkInDate || !checkOutDate) { setMessage("Please select both check-in and check-out dates."); return; }
+        if (checkOutDate <= checkInDate) { setMessage("Check-out should be after check-in."); return; }
         try {
-            setMessage("");
-
-            if (!checkInDate || !checkOutDate) {
-                setMessage(
-                    "Please select check-in and check-out dates"
-                );
-                return;
-            }
-
-            if (checkOutDate <= checkInDate) {
-                setMessage(
-                    "Check-out date must be after check-in date"
-                );
-                return;
-            }
-
-            setLoading(true);
-
-            const token =
-                localStorage.getItem("token");
-
-            const response = await axios.get(
-                "http://localhost:5000/api/bookings/available-rooms",
-                {
-                    params: {
-                        checkInDate,
-                        checkOutDate,
-                    },
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
-
-            if (response.data.success) {
-                setRooms(response.data.rooms);
-
-                if (response.data.rooms.length === 0) {
-                    setMessage(
-                        "No rooms available for selected dates"
-                    );
-                }
-            }
-
-        } catch (error) {
-
-            console.error(
-                "Search Rooms Error:",
-                error
-            );
-
-            setMessage(
-                error.response?.data?.message ||
-                "Unable to search rooms"
-            );
-
-        } finally {
-            setLoading(false);
-        }
+            setLoading(true); setHasSearched(true);
+            const response = await axios.get("http://localhost:5000/api/bookings/available-rooms", {
+                params: { checkInDate, checkOutDate },
+                headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+            });
+            if (response.data.success) { setRooms(response.data.rooms || []); if (!(response.data.rooms || []).length) setMessage("No rooms are available for these dates. Try another stay window."); }
+        } catch (error) { setMessage(error.response?.data?.message || "Unable to search rooms. Please try again."); }
+        finally { setLoading(false); }
     };
 
+    const handleBookRoom = (room) => navigate("/book-room", { state: { room, checkInDate, checkOutDate } });
+    const roomImage = (room) => { const image = room.image || room.roomType?.image || room.roomType?.images?.[0]; return image ? (/^https?:\/\//i.test(image) ? image : `http://localhost:5000${image.startsWith("/") ? "" : "/"}${image}`) : "/images/hotel-maurya.jpg"; };
 
-    const handleBookRoom = (room) => {
-
-        navigate("/book-room", {
-            state: {
-                room,
-                checkInDate,
-                checkOutDate,
-            },
-        });
-
-    };
-
-
-    return (
-        <div className="min-h-screen bg-gray-100 p-6 customer-rooms-page">
-
-            <div className="max-w-6xl mx-auto">
-
-                <h1 className="text-4xl font-bold mb-2 customer-section-title">
-                    Find a Room
-                </h1>
-
-                <p className="text-gray-600 mb-6">
-                    Select your dates to find available rooms.
-                </p>
-
-
-                {/* SEARCH */}
-
-                <div className="bg-white p-6 rounded-xl shadow">
-
-                    <div className="grid md:grid-cols-2 gap-4">
-
-                        <div>
-
-                            <label className="block mb-2 font-semibold">
-                                Check-in Date
-                            </label>
-
-                            <input
-                                type="date"
-                                value={checkInDate}
-                                onChange={(e) =>
-                                    setCheckInDate(e.target.value)
-                                }
-                                className="w-full border p-3 rounded"
-                            />
-
-                        </div>
-
-
-                        <div>
-
-                            <label className="block mb-2 font-semibold">
-                                Check-out Date
-                            </label>
-
-                            <input
-                                type="date"
-                                value={checkOutDate}
-                                onChange={(e) =>
-                                    setCheckOutDate(e.target.value)
-                                }
-                                className="w-full border p-3 rounded"
-                            />
-
-                        </div>
-
-                    </div>
-
-
-                    <button
-                        onClick={searchRooms}
-                        disabled={loading}
-                        className="mt-5 bg-blue-600 text-white px-6 py-3 rounded-lg"
-                    >
-
-                        {loading
-                            ? "Searching..."
-                            : "Search Available Rooms"
-                        }
-
-                    </button>
-
-
-                    {message && (
-                        <p className="mt-4 text-red-600">
-                            {message}
-                        </p>
-                    )}
-
-                </div>
-
-
-                {/* ROOMS */}
-
-                <div className="grid md:grid-cols-3 gap-6 mt-8">
-
-                    {rooms.map((room) => (
-
-                        <div
-                            key={room._id}
-                            className="bg-white rounded-xl shadow p-6"
-                        >
-
-                            <h2 className="text-xl font-bold">
-                                Room {room.roomNumber}
-                            </h2>
-
-                            <p className="text-gray-600 mt-2">
-                                Floor: {room.floor}
-                            </p>
-
-                            <p className="mt-2">
-                                Type:{" "}
-                                {room.roomType?.name}
-                            </p>
-
-                            <p className="mt-2">
-                                Capacity:{" "}
-                                {room.roomType?.capacity}
-                            </p>
-
-                            <p className="text-2xl font-bold mt-4">
-                                ₹
-                                {room.price ||
-                                    room.roomType?.basePrice}
-                                /night
-                            </p>
-
-
-                            <button
-                                onClick={() =>
-                                    handleBookRoom(room)
-                                }
-                                className="w-full mt-5 bg-green-600 text-white py-3 rounded-lg"
-                            >
-                                Book This Room
-                            </button>
-
-                        </div>
-
-                    ))}
-
-                </div>
-
-            </div>
-
-        </div>
-    );
+    return <main className="cx-page cx-rooms-page">
+        <header className="cx-topbar cx-profile-topbar"><Link to="/" className="cx-brand"><span className="cx-brand-mark"><BedDouble size={20} /></span><span>MAURYA<span className="cx-brand-sub">KITCHEN & STAYS</span></span></Link><nav><Link to="/">Home</Link><Link to="/menu">Menu</Link><Link className="is-active" to="/rooms">Rooms</Link></nav><Link to="/profile" className="cx-record-profile">My account <ArrowRight size={15} /></Link></header>
+        <section className="cx-rooms-hero"><img src="/images/hotel-maurya.jpg" alt="Hotel Maurya" /><div className="cx-rooms-hero-shade" /><div className="cx-rooms-hero-copy"><span className="cx-kicker cx-kicker-light">A MORE THOUGHTFUL WAY TO STAY</span><h1>Make room for<br /><em>something wonderful.</em></h1><p>Your dates, your pace, and a little more room to enjoy the journey.</p><div className="cx-rooms-perks"><span><Check size={15} /> Thoughtful comfort</span><span><Check size={15} /> Maurya hospitality</span></div></div><div className="cx-rooms-location"><MapPin size={16} /><span>HOTEL MAURYA<small>A place to feel at home</small></span></div></section>
+        <section className="cx-rooms-content">
+            <form className="cx-room-search-panel" onSubmit={searchRooms}>
+                <div className="cx-room-search-heading"><span className="cx-search-icon"><CalendarDays size={21} /></span><div><span className="cx-kicker">PLAN YOUR STAY</span><h2>Find your room</h2><p>Choose your dates to see what’s available.</p></div></div>
+                <div className="cx-room-search-fields"><label>CHECK IN<input type="date" value={checkInDate} onChange={(e) => setCheckInDate(e.target.value)} min={new Date().toISOString().slice(0, 10)} required /></label><span className="cx-date-connector" aria-hidden="true">→</span><label>CHECK OUT<input type="date" value={checkOutDate} onChange={(e) => setCheckOutDate(e.target.value)} min={checkInDate || new Date().toISOString().slice(0, 10)} required /></label><button type="submit" className="cx-button cx-button-orange" disabled={loading}>{loading ? <><RefreshCw size={16} className="cx-spin" /> Finding rooms…</> : <><Search size={17} /> Search availability</>}</button></div>
+                {message && <p className={`cx-room-message ${rooms.length ? "" : "is-error"}`} role="status">{message}</p>}
+            </form>
+            {hasSearched && !loading && rooms.length > 0 && <div className="cx-room-results-head"><div><span className="cx-kicker">YOUR STAY OPTIONS</span><h2>Rooms for your dates</h2></div><span>{rooms.length} {rooms.length === 1 ? "room" : "rooms"} available</span></div>}
+            {!hasSearched && <div className="cx-room-inspiration"><span className="cx-kicker">A STAY THAT FEELS LIKE YOURS</span><h2>Slow down. Settle in.<br /><em>We’ll take care of the rest.</em></h2><p>Check your dates to explore rooms and choose the right space for your stay.</p></div>}
+            {hasSearched && !loading && rooms.length > 0 && <div className="cx-room-grid">{rooms.map((room, index) => <article className="cx-room-card" key={room._id} style={{ "--card-index": index }}><div className="cx-room-image"><img src={roomImage(room)} alt={`Room ${room.roomNumber}`} onError={(event) => { event.currentTarget.src = "/images/hotel-maurya.jpg"; }} /><span>AVAILABLE FOR YOUR DATES</span></div><div className="cx-room-card-body"><span className="cx-kicker">{room.roomType?.name || "MAURYA ROOM"}</span><h3>Room {room.roomNumber}</h3><div className="cx-room-amenities"><span><MapPin size={14} /> Floor {room.floor ?? "—"}</span><span><Users size={14} /> Up to {room.roomType?.capacity || 2} guests</span><span><Wifi size={14} /> A comfortable stay</span></div><div className="cx-room-price-row"><span><b>₹{Number(room.price || room.roomType?.basePrice || 0).toLocaleString("en-IN")}</b><small> / night</small></span><button className="cx-button cx-button-orange" onClick={() => handleBookRoom(room)}>Choose room <ArrowRight size={16} /></button></div></div></article>)}</div>}
+            {hasSearched && !loading && !rooms.length && message && <div className="cx-room-empty"><span className="cx-empty-icon"><BedDouble size={25} /></span><h3>No rooms found this time</h3><p>{message}</p><button className="cx-button cx-button-outline" onClick={() => { setHasSearched(false); setMessage(""); }}>Change dates</button></div>}
+        </section>
+    </main>;
 };
 
-export default Rooms; 
+export default Rooms;
