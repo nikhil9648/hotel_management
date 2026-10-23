@@ -6,6 +6,9 @@ import {
 } from "../services/bookingService";
 
 import PayNow from "../components/PayNow";
+import { Link } from "react-router-dom";
+import { ArrowRight, CalendarDays, UtensilsCrossed } from "lucide-react";
+import "../styles/CustomerExperience.css";
 
 
 // =====================================================
@@ -150,7 +153,7 @@ const MyBookings = ({ onPaymentSuccess }) => {
 
         return (
 
-            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+            <div className="cx-page cx-record-page cx-bookings-page">
 
                 <div className="text-xl font-semibold">
 
@@ -172,9 +175,9 @@ const MyBookings = ({ onPaymentSuccess }) => {
 
         return (
 
-            <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
+            <div className="cx-page cx-record-page cx-bookings-page">
 
-                <div className="bg-white p-8 rounded-xl shadow text-center">
+                <div className="cx-state-card">
 
                     <h2 className="text-xl font-bold text-red-600">
 
@@ -212,9 +215,9 @@ const MyBookings = ({ onPaymentSuccess }) => {
 
         return (
 
-            <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
+            <div className="cx-page cx-record-page cx-bookings-page">
 
-                <div className="bg-white p-8 rounded-xl shadow text-center">
+                <div className="cx-state-card cx-orders-empty">
 
                     <div className="text-5xl mb-4">
                         🏨
@@ -246,9 +249,11 @@ const MyBookings = ({ onPaymentSuccess }) => {
 
     return (
 
-        <div className="min-h-screen bg-gray-100 p-6">
+        <div className="cx-page cx-record-page cx-bookings-page">
+            <header className="cx-topbar cx-record-topbar"><Link to="/" className="cx-brand"><span className="cx-brand-mark"><UtensilsCrossed size={19} /></span><span>MAURYA<span className="cx-brand-sub">KITCHEN & STAYS</span></span></Link><nav><Link to="/menu">Menu</Link><Link to="/my-orders">My orders</Link><Link className="is-active" to="/my-bookings">My bookings</Link></nav><Link to="/profile" className="cx-record-profile">My account <ArrowRight size={15} /></Link></header>
+            <section className="cx-record-hero cx-booking-record-hero"><div><span className="cx-kicker cx-kicker-light">YOUR HOME AWAY FROM HOME</span><h1>Stay a little.<br /><em>Feel a lot.</em></h1><p>Your room reservations and upcoming Maurya moments.</p></div><div className="cx-record-hero-mark"><CalendarDays size={56} /><span>YOUR<br />STAY<br />AWAITS</span></div></section>
 
-            <div className="max-w-6xl mx-auto">
+            <div className="cx-bookings-list">
 
 
                 {/* HEADER */}
@@ -257,7 +262,7 @@ const MyBookings = ({ onPaymentSuccess }) => {
 
                     <div>
 
-                        <h1 className="text-3xl font-bold">
+                        <h1 className="cx-record-title">
 
                             My Bookings
 
@@ -274,7 +279,7 @@ const MyBookings = ({ onPaymentSuccess }) => {
 
                     <button
                         onClick={fetchBookings}
-                        className="px-4 py-2 bg-gray-800 text-white rounded-lg"
+                        className="cx-refresh-button"
                     >
                         Refresh
                     </button>
@@ -290,7 +295,7 @@ const MyBookings = ({ onPaymentSuccess }) => {
 
                         <div
                             key={booking._id}
-                            className="bg-white rounded-xl shadow-md p-6"
+                            className="cx-booking-card"
                         >
 
 

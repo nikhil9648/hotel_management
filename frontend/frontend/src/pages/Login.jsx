@@ -1,191 +1,56 @@
-
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, LockKeyhole, Mail, UtensilsCrossed } from "lucide-react";
 import { loginUser } from "../services/authService";
+import "../styles/CustomerExperience.css";
 
-const Login = ({ onLogin }) => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+const normalizeRole = (role) => String(role || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+const getDashboardPath = (role) => ({ admin: "/admin", manager: "/admin", receptionist: "/admin/billing", waiter: "/waiter", kitchen: "/kitchen", accountant: "/admin", hr: "/admin", delivery_boy: "/delivery/delivery-dashboard", customer: "/rooms", user: "/rooms" }[normalizeRole(role)] || "/rooms");
 
-  const navigate = useNavigate();
+export default function Login({ onLogin }) {
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const navigate = useNavigate();
 
-  // Normalize role names from the backend
-  const normalizeRole = (role) =>
-    String(role || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[\s-]+/g, "_");
-
-  // Select dashboard according to role
-  const getDashboardPath = (role) => {
-    const paths = {
-      admin: "/admin",
-      manager: "/admin",
-      receptionist: "/admin/billing",
-      waiter: "/waiter",
-      kitchen: "/kitchen",
-      accountant: "/admin",
-      hr: "/admin",
-      delivery_boy: "/delivery/delivery-dashboard",
-      customer: "/rooms",
-      user: "/rooms",
+    const handleSubmit = async (event) => {
+        event.preventDefault(); setError("");
+        if (!email.trim() || !password) { setError("Email and password are required."); return; }
+        setLoading(true);
+        try {
+            const response = await loginUser(email.trim(), password);
+            const payload = response?.data || response;
+            const user = payload?.user || payload?.data?.user;
+            const token = payload?.token || payload?.accessToken || payload?.data?.token;
+            if (!user || !token) { setError(payload?.message || "Login details were not returned. Please try again."); return; }
+            localStorage.setItem("token", token); localStorage.setItem("user", JSON.stringify(user));
+            onLogin?.(user); navigate(getDashboardPath(user.role), { replace: true });
+        } catch (err) {
+            setError(err.response?.data?.message || err.message || "Unable to log in. Check your details and try again.");
+        } finally { setLoading(false); }
     };
 
-    return paths[normalizeRole(role)] || "/rooms";
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-
-    if (!email.trim() || !password) {
-      setError("Email and password are required.");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const response = await loginUser(
-        email.trim(),
-        password
-      );
-
-      console.log("Login response:", response);
-
-      // Support common response structures
-      const payload = response?.data || response;
-      const user = payload?.user || payload?.data?.user;
-      const token =
-        payload?.token ||
-        payload?.accessToken ||
-        payload?.data?.token;
-
-      if (!user || !token) {
-        setError(
-          payload?.message ||
-            "Login response mein user ya token nahi mila."
-        );
-        return;
-      }
-
-      const role = normalizeRole(user.role);
-
-      console.log("Logged-in user:", user);
-      console.log("Normalized role:", role);
-
-      // Save login information
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
-
-      // Update global login state
-      if (onLogin) {
-        onLogin(user);
-      }
-
-      // Redirect according to role
-      const dashboardPath = getDashboardPath(role);
-
-      console.log("Redirecting to:", dashboardPath);
-
-      navigate(dashboardPath, { replace: true });
-    } catch (err) {
-      console.error("Login error:", err);
-
-      setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Unable to login. Please check your credentials and server."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 p-6">
-      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-xl">
-        <h1 className="mb-2 text-center text-3xl font-bold text-gray-900">
-          Hotel &amp; Restaurant
-        </h1>
-
-        <p className="mb-8 text-center text-gray-500">
-          Login to Your Account
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label
-              htmlFor="login-email"
-              className="mb-2 block font-medium text-gray-700"
-            >
-              Email
-            </label>
-
-            <input
-              id="login-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              autoComplete="email"
-              required
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="login-password"
-              className="mb-2 block font-medium text-gray-700"
-            >
-              Password
-            </label>
-
-            <input
-              id="login-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              autoComplete="current-password"
-              required
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {error && (
-            <div
-              role="alert"
-              className="rounded-lg bg-red-100 p-3 text-sm text-red-700"
-            >
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Logging in..." : "Login"}
-          </button>
-
-          <p className="text-center text-sm text-gray-600">
-            Don't have an account?{" "}
-            <Link
-              to="/signup"
-              className="font-semibold text-blue-600 hover:text-blue-800"
-            >
-              Sign Up
-            </Link>
-          </p>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-export default Login;
+    return <main className="cx-login-page">
+        <section className="cx-login-visual">
+            <Link to="/" className="cx-login-back"><ArrowLeft size={16} /> Back to Hotel Maurya</Link>
+            <div className="cx-login-brand"><span className="cx-brand-mark"><UtensilsCrossed size={21} /></span><span>HOTEL MAURYA</span></div>
+            <div className="cx-login-copy"><span className="cx-kicker cx-kicker-light">A WARM WELCOME, EVERY TIME</span><h1>Your place<br />is <em>waiting.</em></h1><p>Settle in, find your favourites, and make yourself at home.</p></div>
+            <div className="cx-login-photo"><img src="/images/hotel-maurya.jpg" alt="Hotel Maurya" /><div className="cx-login-photo-caption"><span>GOOD FOOD. GOOD STAYS.</span><b>Made memorable at Maurya.</b></div></div>
+            <div className="cx-login-visual-foot">HOSPITALITY, WITH HEART <span>✳</span></div>
+        </section>
+        <section className="cx-login-form-side"><div className="cx-login-form-wrap">
+            <div className="cx-login-mobile-brand"><span className="cx-brand-mark"><UtensilsCrossed size={19} /></span> HOTEL MAURYA</div>
+            <span className="cx-kicker">WELCOME BACK</span><h2>Good to see<br />you again.</h2><p className="cx-login-subtitle">Sign in to continue to your account.</p>
+            <form onSubmit={handleSubmit} className="cx-login-form">
+                <label htmlFor="login-email">Email address</label><div className="cx-input-wrap"><Mail size={18} /><input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required /></div>
+                <label htmlFor="login-password">Password</label><div className="cx-input-wrap"><LockKeyhole size={18} /><input id="login-password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" autoComplete="current-password" required /><button type="button" className="cx-reveal-button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>
+                {error && <div className="cx-login-error" role="alert">{error}</div>}
+                <button className="cx-button cx-button-orange cx-login-submit" type="submit" disabled={loading}>{loading ? <><span className="cx-button-spinner" /> Signing you in…</> : <>Sign in <ArrowRight size={18} /></>}</button>
+            </form>
+            <p className="cx-login-signup">New to Hotel Maurya? <Link to="/signup">Create an account</Link></p>
+            <div className="cx-login-help">Your stay, your table, your Maurya. <span>✳</span></div>
+        </div></section>
+    </main>;
+}
