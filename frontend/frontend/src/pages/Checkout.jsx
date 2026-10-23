@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import "../styles/FoodOrdering.css";
 
 const API = "http://localhost:5000/api";
 const TAX_RATE = 0.18;
@@ -23,6 +24,15 @@ const money = (amount) =>
 const getToken = () =>
   localStorage.getItem("token") || localStorage.getItem("accessToken") || "";
 
+const readCart = () => {
+  try {
+    const stored = JSON.parse(localStorage.getItem("cart") || "[]");
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+};
+
 const getFoodId = (item) =>
   item?.foodItem?._id ||
   item?.foodItem ||
@@ -37,6 +47,15 @@ const getErrorMessage = (error) =>
   error?.response?.data?.error ||
   error?.message ||
   "Something went wrong. Please try again.";
+
+const getItemPrice = (item) => {
+  const regular = Number(item.price ?? item.food?.price ?? item.foodItem?.price ?? 0);
+  const discount = Number(item.discountPrice ?? item.food?.discountPrice ?? item.foodItem?.discountPrice);
+  return Number.isFinite(discount) && discount > 0 && discount < regular ? discount : regular;
+};
+
+const getImageUrl = (image) =>
+  !image ? "" : /^(https?:)?\/\//i.test(image) ? image : `http://localhost:5000${image.startsWith("/") ? "" : "/"}${image}`;
 
 function loadRazorpayScript() {
   return new Promise((resolve) => {
@@ -71,7 +90,7 @@ function loadRazorpayScript() {
 export default function Checkout() {
   const navigate = useNavigate();
 
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(readCart);
   const [user, setUser] = useState(null);
 
   const [address, setAddress] = useState(emptyAddress);
@@ -92,6 +111,7 @@ export default function Checkout() {
 
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [cartSyncNotice, setCartSyncNotice] = useState("");
 
   const token = getToken();
 
@@ -111,9 +131,7 @@ export default function Checkout() {
           .reduce(
             (sum, item) =>
               sum +
-              Number(
-                item.price || item.food?.price || item.foodItem?.price || 0,
-              ) *
+              getItemPrice(item) *
                 Number(item.quantity || 0),
             0,
           )
@@ -186,14 +204,30 @@ export default function Checkout() {
   }, []);
 
   useEffect(() => {
-    try {
-      const storedCart = JSON.parse(localStorage.getItem("cart") || "[]");
-      setCart(Array.isArray(storedCart) ? storedCart : []);
-    } catch {
-      setCart([]);
+    let active = true;
+    loadProfile();
+
+    const storedCart = readCart();
+    if (storedCart.length) {
+      axios.get(`${API}/menu/foods`).then((response) => {
+        if (!active) return;
+        const foods = response.data?.foodItems || [];
+        const byId = new Map(foods.map((food) => [String(food._id), food]));
+        const hydrated = storedCart.flatMap((item) => {
+          const currentFood = byId.get(String(getFoodId(item)));
+          return currentFood ? [{ ...item, ...currentFood, quantity: Number(item.quantity || 1) }] : [];
+        });
+        if (hydrated.length !== storedCart.length) {
+          setCartSyncNotice("Some basket items are no longer on the menu. Please review your basket before ordering.");
+        }
+        setCart(hydrated);
+        localStorage.setItem("cart", JSON.stringify(hydrated));
+      }).catch(() => {
+        // Keep the saved cart visible if the menu endpoint is temporarily offline.
+      });
     }
 
-    loadProfile();
+    return () => { active = false; };
   }, [loadProfile]);
 
   const updateAddress = (event) => {
@@ -417,6 +451,11 @@ export default function Checkout() {
 
     if (!cart.length) {
       setError("Your cart is empty.");
+      return;
+    }
+
+    if (cart.some((item) => item.isAvailable === false)) {
+      setError("An item in your basket is currently unavailable. Remove it before ordering.");
       return;
     }
 
@@ -668,20 +707,24 @@ if (!key) {
 
   if (profileLoading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center p-6">
-        <p className="text-gray-600">Loading checkout...</p>
+      <div className="order-page checkout-page checkout-loading">
+        <div className="mx-auto max-w-6xl checkout-shell checkout-loading-card">
+          <span className="order-eyebrow">ALMOST THERE</span>
+          <p>Preparing your checkout…</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
-        <h1 className="mb-2 text-3xl font-bold text-gray-900">Checkout</h1>
+    <div className="order-page checkout-page">
+      <div className="mx-auto max-w-6xl checkout-shell">
+        <div className="checkout-page-top"><button type="button" onClick={() => navigate("/cart")} className="order-back-link">← Back to basket</button><span className="order-step-label">02 <i /> CHECKOUT</span></div>
+        <div className="order-page-heading checkout-heading"><div><span className="order-eyebrow">ALMOST THERE</span><h1>Checkout<span>.</span></h1>
         <p className="mb-8 text-gray-600">
           Confirm your delivery address, apply a coupon, and complete your
           payment.
-        </p>
+        </p></div><span className="basket-heading-mark">02</span></div>
 
         {error && (
           <div
@@ -701,15 +744,17 @@ if (!key) {
           </div>
         )}
 
+        {cartSyncNotice && <div role="status" className="cart-sync-notice">{cartSyncNotice}</div>}
+
         {!cart.length ? (
-          <div className="rounded-xl bg-white p-8 text-center shadow-sm">
-            <h2 className="mb-2 text-xl font-semibold">Your cart is empty</h2>
+          <div className="rounded-xl bg-white p-8 text-center shadow-sm checkout-empty">
+            <h2 className="mb-2 text-xl font-semibold">Your basket is empty</h2>
             <p className="mb-5 text-gray-600">
               Add some delicious food before checking out.
             </p>
             <button
               type="button"
-              onClick={() => navigate("/menu")}
+              onClick={() => navigate("/")}
               className="rounded-lg bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700"
             >
               Browse Menu
@@ -888,14 +933,9 @@ if (!key) {
                   Order Items ({cart.length})
                 </h2>
 
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-gray-100 checkout-items-list">
                   {cart.map((item, index) => {
-                    const itemPrice = Number(
-                      item.price ||
-                        item.food?.price ||
-                        item.foodItem?.price ||
-                        0,
-                    );
+                    const itemPrice = getItemPrice(item);
                     const quantity = Number(item.quantity || 0);
                     const itemName =
                       item.name ||
@@ -906,12 +946,17 @@ if (!key) {
                     return (
                       <div
                         key={getFoodId(item) || index}
-                        className="flex items-center justify-between gap-4 py-4"
+                        className="flex items-center justify-between gap-4 py-4 checkout-item-row"
                       >
+                        <div className="checkout-item-image">
+                          {item.image ? <img src={getImageUrl(item.image)} alt={itemName} loading="lazy" onError={(event) => { event.currentTarget.hidden = true; }} /> : <span aria-hidden="true">✦</span>}
+                        </div>
                         <div className="min-w-0">
+                          {item.category?.name && <span className="checkout-item-category">{item.category.name}</span>}
                           <p className="font-medium text-gray-900">
                             {itemName}
                           </p>
+                  {item.isAvailable === false && <span className="cart-unavailable">Currently unavailable</span>}
                           <p className="mt-1 text-sm text-gray-500">
                             {money(itemPrice)} × {quantity}
                           </p>
@@ -1029,10 +1074,13 @@ if (!key) {
                 and the validated coupon.
               </p>
 
+              {cart.some((item) => item.isAvailable === false) && (
+                <Link to="/cart" className="checkout-unavailable-note">Remove unavailable item from basket</Link>
+              )}
               <button
                 type="button"
                 onClick={placeOrder}
-                disabled={loading || couponLoading || !cart.length}
+                disabled={loading || couponLoading || !cart.length || cart.some((item) => item.isAvailable === false)}
                 className="w-full rounded-lg bg-orange-600 px-5 py-3.5 font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? "Processing..." : `Pay ${money(totalAmount)}`}

@@ -1,732 +1,248 @@
-import React, { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { Link } from "react-router-dom";
 import HomeProfileMenu from "../components/HomeProfileMenu";
-import {
-    Search,
-    ShoppingCart,
-    MapPin,
-    Clock3,
-    ArrowRight,
-    Star,
-    Plus,
-    Utensils,
-    BedDouble,
-    Sparkles,
-    ChevronRight,
-} from "lucide-react";
-
+import { ArrowRight, BedDouble, Check, ChevronLeft, ChevronRight, Clock3, MapPin, Plus, Search, ShoppingBag, Sparkles, Star, Utensils, X } from "lucide-react";
 import "../styles/Home.css";
+import "../styles/FoodOrdering.css";
 
-const categories = [
-{
-name: "North Indian",
-image: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=240&auto=format&fit=crop&q=80",
-},
-{
-name: "Burger",
-image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=240&auto=format&fit=crop&q=80",
-filter: null,
-},
-{
-name: "Pizza",
-image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=240&auto=format&fit=crop&q=80",
-filter: "Pizza & Snacks",
-},
-{
-name: "Desserts",
-image: "https://images.unsplash.com/photo-1551024506-0bcf5f8a9b8d?w=240&auto=format&fit=crop&q=80",
-filter: "Desserts",
-},
-{
-name: "Biryani",
-image: "https://images.unsplash.com/photo-1563379091339-03246963d96c?w=240&auto=format&fit=crop&q=80",
-filter: null,
-},
-{
-name: "Cake",
-image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=240&auto=format&fit=crop&q=80",
-filter: "Desserts",
-},
-{
-name: "Rolls",
-image: "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=240&auto=format&fit=crop&q=80",
-filter: null,
-},
-{
-name: "Noodles",
-image: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=240&auto=format&fit=crop&q=80",
-filter: "Chinese",
-},
-{
-name: "Pasta",
-image: "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?w=240&auto=format&fit=crop&q=80",
-filter: null,
-},
-{
-name: "Dosa",
-image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=240&auto=format&fit=crop&q=80",
-filter: "South Indian",
-},
-{
-name: "Paratha",
-image: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=240&auto=format&fit=crop&q=80",
-filter: "North Indian",
-},
-{
-name: "Salad",
-image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=240&auto=format&fit=crop&q=80",
-filter: null,
-},
-{
-name: "Coffee",
-image: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=240&auto=format&fit=crop&q=80",
-filter: "Beverages",
-},
-{
-name: "Pastry",
-image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=240&auto=format&fit=crop&q=80",
-filter: "Desserts",
-},
-];
+const API = "http://localhost:5000/api";
+const ASSET_BASE = "http://localhost:5000";
 
+const readCart = () => {
+    try {
+        const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+        return Array.isArray(cart) ? cart : [];
+    } catch {
+        return [];
+    }
+};
 
-const dishes = [
-    {
-        id: "paneer",
-        name: "Paneer Butter Masala",
-        category: "North Indian",
-        description: "Creamy tomato gravy with soft paneer",
-        price: 249,
-        rating: 4.7,
-        emoji: "🍛",
-        tag: "Bestseller",
-    },
-    {
-        id: "noodles",
-        name: "Veg Hakka Noodles",
-        category: "Chinese",
-        description: "Wok-tossed with fresh vegetables",
-        price: 189,
-        rating: 4.5,
-        emoji: "🍜",
-        tag: "Popular",
-    },
-    {
-        id: "thali",
-        name: "Deluxe Veg Thali",
-        category: "Thalis",
-        description: "A complete meal made with care",
-        price: 299,
-        rating: 4.8,
-        emoji: "🍱",
-        tag: "Chef's pick",
-    },
-    {
-        id: "dosa",
-        name: "Masala Dosa",
-        category: "South Indian",
-        description: "Crispy dosa with chutneys and sambar",
-        price: 159,
-        rating: 4.6,
-        emoji: "🥞",
-        tag: "Classic",
-    },
-    {
-        id: "pizza",
-        name: "Margherita Pizza",
-        category: "Pizza & Snacks",
-        description: "Cheese, tomato and fresh herbs",
-        price: 219,
-        rating: 4.4,
-        emoji: "🍕",
-        tag: "Favourite",
-    },
-    {
-        id: "gulab-jamun",
-        name: "Gulab Jamun",
-        category: "Desserts",
-        description: "Soft and delicately sweet",
-        price: 99,
-        rating: 4.6,
-        emoji: "🍮",
-        tag: "Sweet treat",
-    },
-    {
-        id: "lime",
-        name: "Fresh Lime Soda",
-        category: "Beverages",
-        description: "Fresh and refreshing",
-        price: 79,
-        rating: 4.3,
-        emoji: "🍋",
-        tag: "Refreshing",
-    },
-    {
-        id: "chole",
-        name: "Chole Bhature",
-        category: "North Indian",
-        description: "Punjabi chole with fluffy bhature",
-        price: 179,
-        rating: 4.5,
-        emoji: "🫓",
-        tag: "Bestseller",
-    },
-];
+const getFoodId = (item) =>
+    String(item?._id || item?.foodItem?._id || item?.foodItem || item?.food?._id || item?.food || item?.foodId || item?.id || "");
+
+const imageUrl = (image) => {
+    if (!image) return "";
+    if (/^(https?:)?\/\//i.test(image) || image.startsWith("data:")) return image;
+    return `${ASSET_BASE}${image.startsWith("/") ? "" : "/"}${image}`;
+};
+
+const formatMoney = (value) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(value || 0));
 
 export default function Home({
     isLoggedIn = Boolean(localStorage.getItem("token")),
     currentUser = null,
     onLogout,
-})  {
-    const [category, setCategory] = useState("All");
+}) {
+    const [categories, setCategories] = useState([]);
+    const [foods, setFoods] = useState([]);
+    const [selectedCategory, setSelectedCategory] = useState("all");
     const [search, setSearch] = useState("");
+    const [cart, setCart] = useState(readCart);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [toast, setToast] = useState("");
 
-    const [cart, setCart] = useState(() => {
+    const loadMenu = useCallback(async () => {
+        setLoading(true);
+        setError("");
         try {
-            return JSON.parse(localStorage.getItem("cart") || "[]");
-        } catch {
-            return [];
-        }
-    });
-
-    const filteredDishes = useMemo(() => {
-        return dishes.filter((dish) => {
-            const matchesCategory =
-                category === "All" || dish.category === category;
-
-            const query = search.trim().toLowerCase();
-
-            const matchesSearch =
-                !query ||
-                `${dish.name} ${dish.category} ${dish.description}`
-                    .toLowerCase()
-                    .includes(query);
-
-            return matchesCategory && matchesSearch;
-        });
-    }, [category, search]);
-
-    const addToCart = (dish) => {
-        const updatedCart = [...cart];
-
-        const existingItem = updatedCart.find(
-            (item) =>
-                item.id === dish.id ||
-                item.foodId === dish.id
-        );
-
-        if (existingItem) {
-            existingItem.quantity =
-                Number(existingItem.quantity || 1) + 1;
-        } else {
-            updatedCart.push({
-                id: dish.id,
-                foodId: dish.id,
-                name: dish.name,
-                price: dish.price,
-                quantity: 1,
+            const [categoryResponse, foodResponse] = await Promise.all([
+                axios.get(`${API}/menu/categories`),
+                axios.get(`${API}/menu/foods`),
+            ]);
+            setCategories((categoryResponse.data?.categories || []).filter((item) => item.isActive !== false));
+            setFoods((foodResponse.data?.foodItems || []).filter((item) => item.isAvailable !== false));
+            const allFoods = foodResponse.data?.foodItems || [];
+            const foodById = new Map(allFoods.map((item) => [String(item._id), item]));
+            const storedCart = readCart();
+            const syncedCart = storedCart.flatMap((item) => {
+                const currentFood = foodById.get(getFoodId(item));
+                return currentFood ? [{ ...item, ...currentFood, quantity: Number(item.quantity || 1) }] : [];
             });
+            if (syncedCart.length !== storedCart.length) {
+                localStorage.setItem("cart", JSON.stringify(syncedCart));
+                setToast("Old menu items jo ab available nahi hain, basket se remove kar diye.");
+                window.setTimeout(() => setToast(""), 3000);
+            }
+            setCart(syncedCart);
+        } catch (requestError) {
+            setError(requestError.response?.data?.message || "Menu abhi load nahi ho paaya. Dobara try karein.");
+        } finally {
+            setLoading(false);
         }
+    }, []);
 
-        setCart(updatedCart);
-        localStorage.setItem(
-            "cart",
-            JSON.stringify(updatedCart)
-        );
+    useEffect(() => {
+        loadMenu();
+        const syncCart = () => setCart(readCart());
+        window.addEventListener("cartUpdated", syncCart);
+        window.addEventListener("storage", syncCart);
+        return () => {
+            window.removeEventListener("cartUpdated", syncCart);
+            window.removeEventListener("storage", syncCart);
+        };
+    }, [loadMenu]);
+
+    const visibleFoods = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        return foods.filter((food) => {
+            const categoryId = String(food.category?._id || food.category || "");
+            const matchesCategory = selectedCategory === "all" || categoryId === selectedCategory;
+            const haystack = `${food.name || ""} ${food.description || ""} ${food.category?.name || ""}`.toLowerCase();
+            return matchesCategory && (!query || haystack.includes(query));
+        });
+    }, [foods, search, selectedCategory]);
+
+    const cartCount = cart.reduce((count, item) => count + Number(item.quantity || 0), 0);
+
+    const addToCart = (food) => {
+        const foodId = getFoodId(food);
+        if (!foodId) return;
+        const existingCart = readCart();
+        const match = existingCart.find((item) => getFoodId(item) === foodId);
+        const updated = match
+            ? existingCart.map((item) => getFoodId(item) === foodId ? { ...item, ...food, quantity: Number(item.quantity || 0) + 1 } : item)
+            : [...existingCart, { ...food, quantity: 1 }];
+        localStorage.setItem("cart", JSON.stringify(updated));
+        setCart(updated);
+        window.dispatchEvent(new Event("cartUpdated"));
+        setToast(`${food.name} cart mein add ho gaya`);
+        window.setTimeout(() => setToast(""), 2200);
     };
 
-    const cartCount = cart.reduce(
-        (total, item) =>
-            total + Number(item.quantity || 1),
-        0
-    );
+    const scrollCategories = (direction) => {
+        document.getElementById("food-category-list")?.scrollBy({ left: direction * 440, behavior: "smooth" });
+    };
 
     return (
-        <main className="maurya">
-            {/* TOP STRIP */}
-            <div className="maurya-topline">
-                <span>
-                    <MapPin size={14} />
-                    Welcome to Hotel Maurya
-                </span>
-
-                <span>
-                    <Clock3 size={14} />
-                    Fresh food · Warm hospitality
-                </span>
+        <main className="food-order-page ordering-home">
+            <div className="food-topline">
+                <span><MapPin size={14} aria-hidden="true" /> HOTEL MAURYA <i /> FRESHLY PREPARED, ALWAYS</span>
+                <span><Clock3 size={14} aria-hidden="true" /> Order online for pickup or delivery</span>
             </div>
 
-            {/* HEADER */}
-            <header className="maurya-header">
-                <Link to="/" className="maurya-brand">
-                    <span className="brand-emblem">✺</span>
-
-                    <span>
-                        <strong>HOTEL MAURYA</strong>
-                        <small>STAY · DINE · UNWIND</small>
-                    </span>
+            <header className="food-header">
+                <Link to="/" className="food-brand" aria-label="Hotel Maurya home">
+                    <span className="food-brand-mark"><Utensils size={20} aria-hidden="true" /></span>
+                    <span><strong>MAURYA</strong><small>KITCHEN & HOSPITALITY</small></span>
                 </Link>
-
-                <nav className="maurya-nav">
-                    <a href="#home" className="is-active">
-                        Home
-                    </a>
-
-                    <a href="#menu">Order Food</a>
-
-                    <a href="#experience">
-                        Our Experience
-                    </a>
-
-                    <Link to="/rooms">Rooms</Link>
-                </nav>
-
-                <label className="maurya-search">
-                    <Search size={18} />
-
-                    <input
-                        type="search"
-                        placeholder="Search dishes or cuisines"
-                        value={search}
-                        onChange={(event) => {
-                            setSearch(event.target.value);
-
-                            if (event.target.value) {
-                                document
-                                    .getElementById("menu")
-                                    ?.scrollIntoView({
-                                        behavior: "smooth",
-                                    });
-                            }
-                        }}
-                    />
-
-                    {search && (
-                        <button
-                            type="button"
-                            onClick={() => setSearch("")}
-                            aria-label="Clear search"
-                        >
-                            ×
-                        </button>
-                    )}
-                </label>
-
-                <Link
-                    to="/cart"
-                    className="maurya-cart"
-                    aria-label={`Cart, ${cartCount} items`}
-                >
-                    <ShoppingCart size={21} />
-                    <span>{cartCount}</span>
-                </Link>
-
-                <div className="maurya-login">
-    <HomeProfileMenu
-        isLoggedIn={isLoggedIn}
-        user={
-            currentUser ||
-            (() => {
-                try {
-                    return JSON.parse(
-                        localStorage.getItem("user") || "null"
-                    );
-                } catch {
-                    return null;
-                }
-            })()
-        }
-        onLogout={onLogout}
-    />
-</div>
-            </header>
-
-            {/* HERO */}
-            <section className="maurya-hero" id="home">
-                <img
-                    src="/images/hotel-maurya.jpg"
-                    alt="Hotel Maurya exterior"
-                />
-
-                <div className="hero-overlay" />
-
-                <div className="hero-inner">
-                    <div className="hero-copy">
-                        <div className="hero-kicker">
-                            <Sparkles size={15} />
-                            A LITTLE LUXURY, EVERY DAY
-                        </div>
-
-                        <h1>
-                            Good food.
-                            <br />
-                            <em>Great stays.</em>
-                        </h1>
-
-                        <p>
-                            Discover your next favourite meal,
-                            unwind in comfort, and enjoy
-                            hospitality that feels personal.
-                        </p>
-
-                        <div className="hero-buttons">
-                            <a
-                                href="#menu"
-                                className="btn btn-orange"
-                            >
-                                <Utensils size={17} />
-                                Explore the menu
-                                <ArrowRight size={16} />
-                            </a>
-
-                            <Link
-                                to="/rooms"
-                                className="btn btn-glass"
-                            >
-                                <BedDouble size={18} />
-                                Discover rooms
-                            </Link>
-                        </div>
-
-                        <div className="hero-trust">
-                            <span>
-                                <Star size={14} fill="currentColor" />
-                                Fresh ingredients
-                            </span>
-
-                            <i />
-
-                            <span>Made with care</span>
-
-                            <i />
-
-                            <span>Warm hospitality</span>
-                        </div>
-                    </div>
-
-                    <div className="hero-floating-card">
-                        <span className="floating-icon">✦</span>
-
-                        <div>
-                            <strong>Your table is waiting</strong>
-                            <small>Comfort food, elevated.</small>
-                        </div>
-
-                        <ChevronRight size={18} />
-                    </div>
-                </div>
-            </section>
-
-            {/* CONTENT */}
-            <div className="maurya-body">
-                <div className="delivery-strip">
-                    <div className="delivery-icon">
-                        <Utensils size={20} />
-                    </div>
-
-                    <div>
-                        <strong>Craving something delicious?</strong>
-                        <small>
-                            Find your favourite flavour at Hotel Maurya.
-                        </small>
-                    </div>
-
-                    <a href="#menu">
-                        Browse menu <ArrowRight size={15} />
-                    </a>
-                </div>
-
-                {/* CATEGORIES */}
-                            {/* SWIGGY-STYLE FOOD CATEGORIES */}
-            <section className="category-section" id="categories">
-                <div className="swiggy-category-heading">
-                    <h2>Order our best food options</h2>
-
-                    <div className="category-arrows">
-                        <button
-                            type="button"
-                            aria-label="Scroll categories left"
-                            onClick={() =>
-                                document
-                                    .getElementById("category-grid")
-                                    ?.scrollBy({
-                                        left: -500,
-                                        behavior: "smooth",
-                                    })
-                            }
-                        >
-                            ‹
-                        </button>
-
-                        <button
-                            type="button"
-                            aria-label="Scroll categories right"
-                            onClick={() =>
-                                document
-                                    .getElementById("category-grid")
-                                    ?.scrollBy({
-                                        left: 500,
-                                        behavior: "smooth",
-                                    })
-                            }
-                        >
-                            ›
-                        </button>
-                    </div>
-                </div>
-
-                <div className="swiggy-category-grid" id="category-grid">
-                    {categories.map((item) => (
-                        <button
-                            type="button"
-                            className={`swiggy-category-item ${
-                                category === (item.filter || item.name)
-                                    ? "selected"
-                                    : ""
-                            }`}
-                            key={item.name}
-                            onClick={() => {
-                                if (item.filter) {
-                                    setCategory(item.filter);
-                                    document
-                                        .getElementById("menu")
-                                        ?.scrollIntoView({
-                                            behavior: "smooth",
-                                        });
-                                } else {
-                                    setSearch(item.name);
-                                    document
-                                        .getElementById("menu")
-                                        ?.scrollIntoView({
-                                            behavior: "smooth",
-                                        });
-                                }
-                            }}
-                        >
-                            <div className="swiggy-category-image">
-                                <img
-                                    src={item.image}
-                                    alt={item.name}
-                                    loading="lazy"
-                                />
-                            </div>
-
-                            <span>{item.name}</span>
-                        </button>
-                    ))}
-                </div>
-            </section>
-
-
-
-                {/* FOOD MENU */}
-                <section className="menu-section" id="menu">
-                    <div className="section-heading menu-heading">
-                        <div>
-                            <span className="section-kicker">
-                                FAVOURITES FROM OUR KITCHEN
-                            </span>
-
-                            <h2>
-                                {category === "All"
-                                    ? "Popular at Maurya"
-                                    : category}
-                            </h2>
-
-                            <p>
-                                Made fresh. Served with extra care.
-                            </p>
-                        </div>
-
-                        <span className="menu-count">
-                            {filteredDishes.length} items
-                        </span>
-                    </div>
-
-                    {filteredDishes.length > 0 ? (
-                        <div className="food-grid">
-                            {filteredDishes.map((dish) => (
-                                <article
-                                    className="food-card"
-                                    key={dish.id}
-                                >
-                                    <div className="food-art">
-                                        <span className="food-tag">
-                                            {dish.tag}
-                                        </span>
-
-                                        <span className="veg-dot">
-                                            <i />
-                                        </span>
-
-                                        <span className="food-emoji">
-                                            {dish.emoji}
-                                        </span>
-                                    </div>
-
-                                    <div className="food-info">
-                                        <div className="food-title-line">
-                                            <h3>{dish.name}</h3>
-
-                                            <span className="food-rating">
-                                                <Star
-                                                    size={12}
-                                                    fill="currentColor"
-                                                />
-                                                {dish.rating}
-                                            </span>
-                                        </div>
-
-                                        <p>{dish.description}</p>
-
-                                        <div className="food-bottom">
-                                            <strong>
-                                                ₹{dish.price}
-                                            </strong>
-
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    addToCart(dish)
-                                                }
-                                            >
-                                                <Plus size={16} />
-                                                Add
-                                            </button>
-                                        </div>
-                                    </div>
-                                </article>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="no-results">
-                            <Search size={27} />
-
-                            <strong>No dishes found</strong>
-
-                            <span>
-                                Try another search or category.
-                            </span>
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setSearch("");
-                                    setCategory("All");
-                                }}
-                            >
-                                Clear filters
-                            </button>
-                        </div>
-                    )}
-
-                    <p className="demo-warning">
-                        Sample menu data — connect your food API
-                        for actual items and prices.
-                    </p>
-                </section>
-
-                {/* PROMOTIONS */}
-                <section
-                    className="promo-grid"
-                    id="experience"
-                >
-                    <article className="promo-card food-promo">
-                        <div className="promo-icon">♨</div>
-
-                        <span className="section-kicker">
-                            A MAURYA MOMENT
-                        </span>
-
-                        <h2>
-                            Comfort food.
-                            <br />
-                            Made memorable.
-                        </h2>
-
-                        <p>
-                            Find a new favourite or return to an old one.
-                        </p>
-
-                        <a
-                            href="#menu"
-                            className="btn btn-orange"
-                        >
-                            Order food <ArrowRight size={15} />
-                        </a>
-                    </article>
-
-                    <article className="promo-card room-promo">
-                        <div className="room-promo-content">
-                            <span className="section-kicker">
-                                STAY A LITTLE LONGER
-                            </span>
-
-                            <h2>
-                                Your own space
-                                <br />
-                                to unwind.
-                            </h2>
-
-                            <p>
-                                Thoughtful comforts and a warm welcome.
-                            </p>
-
-                            <Link
-                                to="/rooms"
-                                className="btn btn-dark"
-                            >
-                                <BedDouble size={16} />
-                                Explore rooms
-                                <ArrowRight size={15} />
-                            </Link>
-                        </div>
-                    </article>
-                </section>
-
-                <section className="maurya-values">
-                    <span className="values-symbol">✺</span>
-
-                    <div>
-                        <span className="section-kicker">
-                            THE MAURYA EXPERIENCE
-                        </span>
-
-                        <h2>
-                            Hospitality is how we make you feel.
-                        </h2>
-
-                        <p>
-                            Come for the food. Stay for the comfort.
-                            Leave with a reason to return.
-                        </p>
-                    </div>
-
-                    <Link to="/rooms">
-                        Discover Hotel Maurya
-                        <ArrowRight size={16} />
-                    </Link>
-                </section>
-            </div>
-
-            {/* FOOTER */}
-            <footer className="maurya-footer">
-                <Link to="/" className="footer-brand">
-                    ✺ HOTEL MAURYA
-                </Link>
-
-                <span>Stay · Dine · Unwind</span>
-
-                <div>
+                <nav className="food-main-nav" aria-label="Main navigation">
+                    <a className="active" href="#home">Home</a>
                     <a href="#menu">Menu</a>
                     <Link to="/rooms">Rooms</Link>
-                    {!isLoggedIn && <Link to="/login">Sign in</Link>}
-                </div>
+                </nav>
+                <label className="food-search">
+                    <Search size={18} aria-hidden="true" />
+                    <input value={search} onChange={(event) => { setSearch(event.target.value); setSelectedCategory("all"); }} placeholder="Search dishes, cuisines..." aria-label="Search dishes and cuisines" />
+                    {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search"><X size={16} /></button>}
+                </label>
+                <HomeProfileMenu isLoggedIn={isLoggedIn} user={currentUser} onLogout={onLogout} />
+                <Link to="/cart" className="food-cart-link" aria-label={`Cart, ${cartCount} items`}>
+                    <ShoppingBag size={19} aria-hidden="true" /><span>Cart</span><b>{cartCount}</b>
+                </Link>
+            </header>
 
-                <small>
-                    © {new Date().getFullYear()} Hotel Maurya
-                </small>
-            </footer>
+            <section className="food-hero" id="home" aria-label="Hotel Maurya dining">
+                <img className="food-hero-image" src="/images/hotel-maurya.jpg" alt="Hotel Maurya" fetchPriority="high" />
+                <div className="food-hero-overlay" />
+                <div className="food-hero-content">
+                    <span className="food-eyebrow"><Sparkles size={14} aria-hidden="true" /> GOOD FOOD, GOOD MOOD</span>
+                    <h1>Your next<br /><em>craving</em> starts here.</h1>
+                    <p>Fresh picks from the Maurya kitchen, ready when you are.</p>
+                    <div className="food-hero-actions">
+                        <a className="food-primary-button" href="#menu">Explore menu <ArrowRight size={17} /></a>
+                        <Link className="food-ghost-button" to="/rooms"><BedDouble size={17} /> Discover rooms</Link>
+                    </div>
+                </div>
+                <div className="food-hero-note"><span className="food-note-icon"><Star size={17} fill="currentColor" /></span><span><b>Made fresh</b><small>From our kitchen to your table</small></span></div>
+                <span className="food-hero-orbit food-hero-orbit-one" aria-hidden="true" />
+                <span className="food-hero-orbit food-hero-orbit-two" aria-hidden="true" />
+            </section>
+
+            <div className="food-content-wrap">
+                <section className="food-promise-strip">
+                    <span className="promise-icon"><Utensils size={19} aria-hidden="true" /></span>
+                    <span><b>What sounds good today?</b><small>Pick a favourite and we’ll take it from here.</small></span>
+                    <a href="#menu">Browse dishes <ArrowRight size={15} /></a>
+                </section>
+
+                <section className="food-category-section" aria-labelledby="category-title">
+                    <div className="food-section-heading">
+                        <div><span className="food-section-kicker">FIND YOUR FLAVOUR</span><h2 id="category-title">Browse by category</h2></div>
+                        <div className="food-carousel-controls">
+                            <button type="button" aria-label="Scroll categories left" onClick={() => scrollCategories(-1)}><ChevronLeft size={19} /></button>
+                            <button type="button" aria-label="Scroll categories right" onClick={() => scrollCategories(1)}><ChevronRight size={19} /></button>
+                        </div>
+                    </div>
+                    <div className="food-category-list" id="food-category-list">
+                        <button type="button" className={`food-category-chip ${selectedCategory === "all" ? "selected" : ""}`} onClick={() => setSelectedCategory("all")}>
+                            <span className="category-all-art"><Utensils size={27} aria-hidden="true" /></span><b>Everything</b>
+                        </button>
+                        {categories.map((item) => (
+                            <button type="button" key={item._id} className={`food-category-chip ${selectedCategory === item._id ? "selected" : ""}`} onClick={() => setSelectedCategory(item._id)}>
+                                <span className="food-category-art">
+                                    {item.image ? <img src={imageUrl(item.image)} alt="" loading="lazy" onError={(event) => { event.currentTarget.hidden = true; }} /> : <Utensils size={25} aria-hidden="true" />}
+                                </span>
+                                <b>{item.name}</b>
+                            </button>
+                        ))}
+                    </div>
+                </section>
+
+                <section className="food-menu-section" id="menu" aria-labelledby="menu-title">
+                    <div className="food-section-heading menu-title-row">
+                        <div><span className="food-section-kicker">MADE WITH CARE</span><h2 id="menu-title">{selectedCategory === "all" ? "The good stuff" : categories.find((item) => item._id === selectedCategory)?.name || "Menu"}</h2><p>Real dishes from our current menu.</p></div>
+                        <span className="food-item-count">{loading ? "Loading…" : `${visibleFoods.length} ${visibleFoods.length === 1 ? "dish" : "dishes"}`}</span>
+                    </div>
+
+                    {error && <div className="food-error" role="alert"><span>{error}</span><button type="button" onClick={loadMenu}>Try again</button></div>}
+                    {loading ? (
+                        <div className="food-product-grid" aria-label="Loading menu" aria-busy="true">{Array.from({ length: 6 }, (_, index) => <div className="food-product-skeleton" key={index}><span /><i /><i /></div>)}</div>
+                    ) : visibleFoods.length ? (
+                        <div className="food-product-grid">
+                            {visibleFoods.map((food, index) => {
+                                const originalPrice = Number(food.price || 0);
+                                const discountPrice = Number(food.discountPrice);
+                                const price = Number.isFinite(discountPrice) && discountPrice > 0 && discountPrice < originalPrice
+                                    ? discountPrice
+                                    : originalPrice;
+                                return (
+                                    <article className="food-product-card" key={food._id} style={{ "--card-order": index }}>
+                                        <div className="food-product-image">
+                                            {food.image ? <img src={imageUrl(food.image)} alt={food.name} loading="lazy" onError={(event) => { event.currentTarget.hidden = true; }} /> : <span className="food-image-fallback"><Utensils size={32} aria-hidden="true" /></span>}
+                                            {food.isFeatured && <span className="food-feature-tag"><Sparkles size={12} /> Kitchen pick</span>}
+                                            <span className={`food-type-indicator ${food.foodType === "non-veg" ? "non-veg" : "veg"}`} title={food.foodType || "veg"}><i /></span>
+                                        </div>
+                                        <div className="food-product-info">
+                                            <span className="food-product-category">{food.category?.name || "Maurya Kitchen"}</span>
+                                            <h3>{food.name}</h3>
+                                            {food.description && <p>{food.description}</p>}
+                                            <div className="food-product-bottom">
+                                                <span className="food-price">{formatMoney(price)}{price !== originalPrice && <del>{formatMoney(originalPrice)}</del>}</span>
+                                                <button type="button" onClick={() => addToCart(food)} aria-label={`Add ${food.name} to cart`}><Plus size={16} /> Add</button>
+                                            </div>
+                                        </div>
+                                    </article>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="food-empty-results"><Search size={24} aria-hidden="true" /><b>No dishes found</b><span>Try another search or select a different category.</span><button type="button" onClick={() => { setSearch(""); setSelectedCategory("all"); }}>Clear filters</button></div>
+                    )}
+                </section>
+
+                <section className="food-room-promo" id="experience">
+                    <span className="promo-spark" aria-hidden="true"><Sparkles size={22} /></span>
+                    <span className="food-section-kicker">STAY A LITTLE LONGER</span>
+                    <h2>Make a Maurya moment<br />out of your next getaway.</h2>
+                    <Link to="/rooms" className="food-primary-button">Explore rooms <ArrowRight size={16} /></Link>
+                </section>
+            </div>
+
+            <footer className="food-footer"><Link to="/">MAURYA</Link><span>Stay · Dine · Unwind</span><Link to="/menu">Full menu <ArrowRight size={14} /></Link></footer>
+            {toast && <div className="food-toast" role="status"><Check size={17} /> {toast}</div>}
         </main>
     );
 }
