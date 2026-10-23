@@ -48,16 +48,19 @@ export default function DeliveryBoyDashboard() {
 
         // Only active delivery orders should appear here.
         const activeOrders = fetchedOrders.filter((order) => {
-          const status = (
-            order.status ||
-            order.orderStatus ||
-            ""
-          ).toLowerCase();
+  const status = String(
+    order.status || order.orderStatus || ""
+  ).toLowerCase();
 
-          return ["ready", "out_for_delivery"].includes(status);
-        });
+  return [
+    "confirmed",
+    "preparing",
+    "ready",
+    "out_for_delivery",
+  ].includes(status);
+});
 
-        setOrders(activeOrders);
+setOrders(activeOrders);
         setError("");
       } catch (err) {
         console.error("Fetch delivery orders error:", err);

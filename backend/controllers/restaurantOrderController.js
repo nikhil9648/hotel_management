@@ -1361,13 +1361,11 @@ const assignDeliveryBoy = async (req, res) => {
         if (!deliveryBoy) {
             return sendError(res, 404, "Active delivery boy not found");
         }
-
+        order.orderStatus = "out_for_delivery";
         order.deliveryBoy = deliveryBoy._id;
         order.deliveryAssignedAt = new Date();
 
-        if (order.orderStatus === "ready") {
-            order.orderStatus = "out_for_delivery";
-        }
+       
 
         await order.save();
 
@@ -1400,7 +1398,9 @@ const getMyDeliveryOrders = async (req, res) => {
         const orders = await RestaurantOrder.find({
   deliveryBoy: req.user._id,
   orderType: "delivery",
-  orderStatus: { $in: ["ready", "out_for_delivery"] },
+  orderStatus: {
+    $in: ["pending", "confirmed", "preparing", "ready", "out_for_delivery"],
+},
 })
   .populate("customer", "name phone")
   .populate("deliveryBoy", "name phone")
@@ -1452,7 +1452,7 @@ const verifyDeliveryOtp = async (req, res) => {
                 deliveryOtpAttempts: { $lt: MAX_OTP_ATTEMPTS },
             },
             { $inc: { deliveryOtpAttempts: 1 } },
-            { new: true }
+            { returnDocument: "after" }
         ).select("+deliveryOtpEncrypted");
 
         if (!order) {
