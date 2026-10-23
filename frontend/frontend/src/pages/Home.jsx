@@ -132,6 +132,7 @@ export default function Home({
                     <a className="active" href="#home">Home</a>
                     <a href="#menu">Menu</a>
                     <Link to="/rooms">Rooms</Link>
+                    <Link to="/contact">Contact us</Link>
                 </nav>
                 <label className="food-search">
                     <Search size={18} aria-hidden="true" />

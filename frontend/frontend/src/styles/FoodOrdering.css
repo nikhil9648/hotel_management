@@ -2,8 +2,8 @@
 
 .ordering-home,
 .order-page {
-  --food-orange: #ff5a1f;
-  --food-orange-dark: #e9440c;
+  --food-orange: #b58a56;
+  --food-orange-dark: #846136;
   --food-green: #26794b;
   --food-ink: var(--text, #22251f);
   --food-muted: var(--text-secondary, #74786f);
@@ -311,18 +311,18 @@
   .order-page *, .order-page *::before, .order-page *::after { scroll-behavior:auto!important; animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; }
 }
 
-/* Match the customer pages to the bright, food-first Maurya orange system. */
-.ordering-home .food-topline { background:#e94b12; }
-.ordering-home .food-brand-mark { border-color:#ffe0d1; color:#ed4c15; background:#fff2ea; }
+/* Restrained saffron and forest palette: modern food UI without a red wash. */
+.ordering-home .food-topline { background:#20372c; }
+.ordering-home .food-brand-mark { border-color:#e7dcc9; color:#997245; background:#f7f0e4; }
 .ordering-home .food-brand strong { color:#282522; }
-.ordering-home .food-main-nav a.active::after { background:#ff5a1f; }
-.ordering-home .food-section-kicker,.ordering-home .food-product-category { color:#db4a1c; }
-.ordering-home .food-hero { background:#ef4b12; }
-.ordering-home .food-hero-overlay { background:linear-gradient(90deg,rgba(183,51,8,.92) 0%,rgba(220,64,12,.79) 46%,rgba(230,76,20,.34) 100%),linear-gradient(0deg,rgba(146,40,9,.18),transparent 60%); }
-.ordering-home .food-hero h1 em { color:#ffd8bd; }
-.ordering-home .food-category-art,.ordering-home .category-all-art { color:#df4b1b; background:#fff0e7; }
-.ordering-home .category-all-art { color:#fff; background:linear-gradient(140deg,#ff8c53,#e54812); }
-.ordering-home .food-product-card:hover { border-color:#ffc5a9; }
-.ordering-home .food-room-promo { background:linear-gradient(125deg,#fff1e8,#fff9f4); }
-.ordering-home .food-room-promo .food-section-kicker { color:#d94b20; }
-.ordering-home .food-room-promo .promo-spark { color:#ef5a24; background:#ffe1d0; }
+.ordering-home .food-main-nav a.active::after { background:#b58a56; }
+.ordering-home .food-section-kicker,.ordering-home .food-product-category { color:#846136; }
+.ordering-home .food-hero { background:#20372c; }
+.ordering-home .food-hero-overlay { background:linear-gradient(90deg,rgba(18,39,29,.87) 0%,rgba(25,46,34,.66) 45%,rgba(28,44,32,.16) 100%),linear-gradient(0deg,rgba(14,24,19,.20),transparent 60%); }
+.ordering-home .food-hero h1 em { color:#e9c99c; }
+.ordering-home .food-category-art,.ordering-home .category-all-art { color:#765d3e; background:#f1ecdf; }
+.ordering-home .category-all-art { color:#fff; background:linear-gradient(140deg,#c8a46b,#718560); }
+.ordering-home .food-product-card:hover { border-color:#d8c6a6; }
+.ordering-home .food-room-promo { background:linear-gradient(125deg,#f0ede3,#f8f5ec); }
+.ordering-home .food-room-promo .food-section-kicker { color:#846136; }
+.ordering-home .food-room-promo .promo-spark { color:#8d7047; background:#e9e0cf; }

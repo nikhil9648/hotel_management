@@ -41,6 +41,7 @@ export default function Menu() {
         const text = `${food.name || ""} ${food.description || ""} ${food.category?.name || ""}`.toLowerCase();
         return categoryMatches && text.includes(query.trim().toLowerCase());
     }), [foods, selectedCategory, query]);
+    const heroFoodImage = assetUrl(foods.find((food) => food.isFeatured && food.image)?.image || foods.find((food) => food.image)?.image);
 
     const addToCart = (food) => {
         let cart = [];
@@ -60,7 +61,7 @@ export default function Menu() {
             <div className="cx-hero-orbit cx-orbit-one" /><div className="cx-hero-orbit cx-orbit-two" />
             <header className="cx-topbar cx-topbar-dark">
                 <Link to="/" className="cx-brand"><span className="cx-brand-mark"><UtensilsCrossed size={20} /></span><span>MAURYA<span className="cx-brand-sub">KITCHEN & STAYS</span></span></Link>
-                <nav><Link to="/">Home</Link><Link className="is-active" to="/menu">Menu</Link><Link to="/my-orders">My orders</Link><Link to="/my-bookings">My bookings</Link></nav>
+                <nav><Link to="/">Home</Link><Link className="is-active" to="/menu">Menu</Link><Link to="/rooms">Rooms</Link><Link to="/contact">Contact us</Link><Link to="/my-orders">My orders</Link></nav>
                 <Link to="/cart" className="cx-cart-link"><ShoppingBag size={18} /> <span>Bag</span><b>{cartCount}</b></Link>
             </header>
             <div className="cx-hero-content">
@@ -70,7 +71,7 @@ export default function Menu() {
                 <label className="cx-searchbox"><Search size={20} /><input aria-label="Search food" placeholder="Search dishes, flavours or categories" value={query} onChange={(e) => setQuery(e.target.value)} />{query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search"><X size={18} /></button>}</label>
                 <div className="cx-hero-note"><span className="cx-live-dot" /> Made fresh when you order <span className="cx-note-divider">·</span> <Clock3 size={15} /> Kitchen favourites</div>
             </div>
-            <div className="cx-hero-art" aria-hidden="true"><div className="cx-hero-plate"><img src="/images/hotel-maurya.jpg" alt="" /></div><span className="cx-art-spark cx-spark-a">✳</span><span className="cx-art-spark cx-spark-b">✳</span><span className="cx-art-label">MADE WITH<br />A LITTLE EXTRA LOVE</span></div>
+            <div className="cx-hero-art" aria-hidden="true"><div className="cx-hero-plate">{heroFoodImage ? <img src={heroFoodImage} alt="" /> : <UtensilsCrossed size={70} />}</div><span className="cx-art-spark cx-spark-a">✳</span><span className="cx-art-spark cx-spark-b">✳</span><span className="cx-art-label">MADE WITH<br />A LITTLE EXTRA LOVE</span></div>
             <div className="cx-hero-bottom">A TABLE FULL OF SOMETHING GOOD <ArrowRight size={16} /></div>
         </section>
 

@@ -22,6 +22,7 @@ import Menu from "./pages/Menu";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import MyOrders from "./pages/MyOrders";
+import ContactUs from "./pages/ContactUs";
 
 // Admin Pages
 import AdminMenu from "./pages/AdminMenu";
@@ -351,6 +352,7 @@ function App() {
                     {/* Public Browsing */}
                     <Route path="/menu" element={<Menu />} />
                     <Route path="/rooms" element={<Rooms />} />
+                    <Route path="/contact" element={<ContactUs />} />
 
                     {/* Customer Pages */}
                     <Route

@@ -250,7 +250,7 @@ const MyBookings = ({ onPaymentSuccess }) => {
     return (
 
         <div className="cx-page cx-record-page cx-bookings-page">
-            <header className="cx-topbar cx-record-topbar"><Link to="/" className="cx-brand"><span className="cx-brand-mark"><UtensilsCrossed size={19} /></span><span>MAURYA<span className="cx-brand-sub">KITCHEN & STAYS</span></span></Link><nav><Link to="/menu">Menu</Link><Link to="/my-orders">My orders</Link><Link className="is-active" to="/my-bookings">My bookings</Link></nav><Link to="/profile" className="cx-record-profile">My account <ArrowRight size={15} /></Link></header>
+            <header className="cx-topbar cx-record-topbar"><Link to="/" className="cx-brand"><span className="cx-brand-mark"><UtensilsCrossed size={19} /></span><span>MAURYA<span className="cx-brand-sub">KITCHEN & STAYS</span></span></Link><nav><Link to="/">Home</Link><Link to="/menu">Menu</Link><Link to="/rooms">Rooms</Link><Link to="/contact">Contact us</Link><Link to="/my-orders">My orders</Link><Link className="is-active" to="/my-bookings">My bookings</Link></nav><Link to="/profile" className="cx-record-profile">My account <ArrowRight size={15} /></Link></header>
             <section className="cx-record-hero cx-booking-record-hero"><div><span className="cx-kicker cx-kicker-light">YOUR HOME AWAY FROM HOME</span><h1>Stay a little.<br /><em>Feel a lot.</em></h1><p>Your room reservations and upcoming Maurya moments.</p></div><div className="cx-record-hero-mark"><CalendarDays size={56} /><span>YOUR<br />STAY<br />AWAITS</span></div></section>
 
             <div className="cx-bookings-list">
