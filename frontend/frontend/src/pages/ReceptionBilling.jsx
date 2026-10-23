@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import {
     Html5QrcodeScanner,
@@ -54,6 +54,74 @@ const isCancelled = (order) =>
         String(order?.orderStatus || "").toLowerCase()
     );
 
+const normalizeWhatsAppPhone = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+
+    const hasInternationalPrefix = raw.startsWith("+") || raw.startsWith("00");
+    let digits = raw.replace(/\D/g, "");
+
+    if (digits.startsWith("00")) digits = digits.slice(2);
+    if (digits.length === 10 && /^[6-9]/.test(digits)) digits = `91${digits}`;
+    else if (digits.length === 12 && digits.startsWith("91")) {
+        // Already in India country-code format.
+    } else if (!hasInternationalPrefix && digits.length === 11 && digits.startsWith("0")) {
+        digits = `91${digits.slice(1)}`;
+    }
+
+    return digits.length >= 8 && digits.length <= 15 && /^[1-9]\d+$/.test(digits)
+        ? digits
+        : "";
+};
+
+const buildWhatsAppReceipt = (bill) => {
+    const lines = [
+        `Hello ${bill.customerName || "Customer"},`,
+        "",
+        "Thank you for visiting Hotel & Restaurant!",
+        "",
+        "Here is your payment receipt:",
+    ];
+
+    const tableName = bill.table?.tableNumber || bill.table?.name;
+    if (tableName) lines.push(`Table: ${tableName}`);
+    if (bill.billNumber) lines.push(`Bill/Receipt ID: ${bill.billNumber}`);
+
+    const billDate = bill.paidAt || bill.updatedAt || bill.createdAt;
+    if (billDate && !Number.isNaN(new Date(billDate).getTime())) {
+        lines.push(`Bill Date: ${new Date(billDate).toLocaleString()}`);
+    }
+
+    const items = (bill.orders || []).flatMap((order) => order.items || []);
+    if (items.length) {
+        lines.push("Items:");
+        items.forEach((item) => {
+            const name = item.name || item.food?.name;
+            const quantity = Number(item.quantity);
+            const amount = Number(item.total ?? (Number(item.price) * quantity));
+            if (!name) return;
+            const details = Number.isFinite(quantity) && quantity > 0
+                ? `${quantity} × ${name}`
+                : name;
+            lines.push(Number.isFinite(amount)
+                ? `- ${details}: ${money(amount)}`
+                : `- ${details}`);
+        });
+    }
+
+    if (bill.subtotal != null) lines.push(`Subtotal: ${money(bill.subtotal)}`);
+    if (bill.taxAmount != null) lines.push(`Tax: ${money(bill.taxAmount)}`);
+    if (bill.discountAmount != null) lines.push(`Discount: ${money(bill.discountAmount)}`);
+    if (bill.totalAmount != null) lines.push(`Total Amount: ${money(bill.totalAmount)}`);
+    if (bill.paidAmount != null) lines.push(`Amount Paid: ${money(bill.paidAmount)}`);
+    if (bill.paymentMethod && bill.paymentMethod !== "pending") {
+        lines.push(`Payment Method: ${bill.paymentMethod}`);
+    }
+    lines.push("Payment Status: PAID", "", "Thank you for your visit. We look forward to serving you again!");
+
+    return lines.join("\n");
+};
+
 export default function RestaurantBilling() {
     const [tables, setTables] = useState([]);
     const [selectedTable, setSelectedTable] = useState(null);
@@ -76,6 +144,8 @@ export default function RestaurantBilling() {
     const [paymentMethod, setPaymentMethod] = useState("cash");
     const [pageError, setPageError] = useState("");
     const [pageMessage, setPageMessage] = useState("");
+    const [whatsAppUrl, setWhatsAppUrl] = useState("");
+    const paymentLockRef = useRef(false);
 
     const token =
         localStorage.getItem("token") ||
@@ -150,6 +220,7 @@ export default function RestaurantBilling() {
             setLoading(true);
             setPageError("");
             setPageMessage("");
+            setWhatsAppUrl("");
 
             setSelectedTable(tableId);
             setTableAccount(null);
@@ -494,6 +565,8 @@ export default function RestaurantBilling() {
     // --------------------------------------------------
 
     const payBill = async () => {
+        if (paymentLockRef.current) return;
+
         if (!bill?._id) {
             setPageError("Generate a bill first.");
             return;
@@ -513,10 +586,22 @@ export default function RestaurantBilling() {
 
         if (!confirmed) return;
 
+        paymentLockRef.current = true;
+        setPaymentLoading(true);
+
+        // Reserve a user-gesture-authorized tab before the payment request yields.
+        let whatsappTab = null;
         try {
-            setPaymentLoading(true);
+            whatsappTab = window.open("about:blank", "_blank");
+        } catch {
+            // Payment must still proceed when the browser blocks popups.
+        }
+
+        let data;
+        try {
             setPageError("");
             setPageMessage("");
+            setWhatsAppUrl("");
 
             const response = await axios.post(
                 `${API}/restaurant-bills/${bill._id}/pay`,
@@ -524,38 +609,62 @@ export default function RestaurantBilling() {
                 headers
             );
 
-            const data = response.data?.data || response.data;
-
+            data = response.data?.data || response.data;
             if (!data?.success) {
-                throw new Error(
-                    data?.message || "Payment failed."
-                );
+                throw new Error(data?.message || "Payment failed.");
+            }
+        } catch (error) {
+            try { whatsappTab?.close(); } catch { /* Ignore popup cleanup errors. */ }
+            console.error("Pay bill:", error.response?.data || error);
+            setPageError(getErrorMessage(error));
+            paymentLockRef.current = false;
+            setPaymentLoading(false);
+            return;
+        }
+
+        // The payment is confirmed. WhatsApp opening is a separate best-effort
+        // action and must never make a successful payment appear to have failed.
+        const paidBill = data.bill || {
+            ...bill,
+            paymentStatus: "paid",
+            status: "paid",
+            paymentMethod,
+        };
+        setBill(paidBill);
+
+        const receiptBill = data.bill;
+        const recipient = normalizeWhatsAppPhone(receiptBill?.customerPhone);
+        if (!receiptBill) {
+            try { whatsappTab?.close(); } catch { /* Ignore popup cleanup errors. */ }
+            setPageMessage("Bill payment completed successfully, but the backend did not return receipt details to share.");
+        } else if (!recipient) {
+            try { whatsappTab?.close(); } catch { /* Ignore popup cleanup errors. */ }
+            setPageMessage("Bill payment completed successfully. WhatsApp receipt was not opened because this bill has no valid customer phone number.");
+        } else {
+            const url = `https://wa.me/${recipient}?text=${encodeURIComponent(buildWhatsAppReceipt(receiptBill))}`;
+            let opened = false;
+            try {
+                if (whatsappTab && !whatsappTab.closed) {
+                    whatsappTab.location.href = url;
+                    opened = true;
+                }
+            } catch {
+                // Fall through to the explicit link below after payment.
             }
 
-            setBill(data.bill || {
-                ...bill,
-                paymentStatus: "paid",
-                status: "paid",
-                paymentMethod,
-            });
-
-            setPageMessage("Bill payment completed successfully.");
-
-            // Refresh table availability and order state.
-            await loadTables();
-
-            // Keep the paid bill visible until the user explicitly
-            // chooses another table or starts a fresh billing session.
-        } catch (error) {
-            console.error(
-                "Pay bill:",
-                error.response?.data || error
-            );
-
-            setPageError(getErrorMessage(error));
-        } finally {
-            setPaymentLoading(false);
+            if (opened) {
+                setPageMessage("Bill payment completed successfully. Review the receipt in WhatsApp and press Send to share it.");
+            } else {
+                try { whatsappTab?.close(); } catch { /* Ignore popup cleanup errors. */ }
+                setWhatsAppUrl(url);
+                setPageMessage("Bill payment completed successfully. Your browser blocked the WhatsApp tab; use the link below to review the receipt.");
+            }
         }
+
+        // Refresh table availability and order state.
+        await loadTables();
+        paymentLockRef.current = false;
+        setPaymentLoading(false);
     };
 
     // --------------------------------------------------
@@ -622,6 +731,7 @@ export default function RestaurantBilling() {
         resetCoupon();
         setPageError("");
         setPageMessage("");
+        setWhatsAppUrl("");
 
         if (tableId) {
             await loadTableAccount(tableId);
@@ -703,6 +813,16 @@ export default function RestaurantBilling() {
                     }}
                 >
                     {pageMessage}
+                    {whatsAppUrl && (
+                        <a
+                            href={whatsAppUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ display: "block", marginTop: "10px", color: "#075e54", fontWeight: "bold" }}
+                        >
+                            Open WhatsApp receipt
+                        </a>
+                    )}
                 </div>
             )}
 

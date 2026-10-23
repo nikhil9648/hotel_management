@@ -6,10 +6,6 @@ const RestaurantBill = require("../models/RestaurantBill");
 const RestaurantOrder = require("../models/RestaurantOrder");
 const RestaurantTable = require("../models/RestaurantTable");
 const Coupon = require("../models/Coupon");
-const {
-    sendSMS,
-    sendWhatsAppText,
-} = require("../services/twilioService");
 
 const TAX_RATE = 0.18;
 
@@ -382,6 +378,8 @@ const payRestaurantBill = async (req, res) => {
         bill.paidAmount = bill.totalAmount;
         bill.status = "paid";
         bill.paidAt = new Date();
+        await bill.save();
+
         // Update restaurant orders.
         await RestaurantOrder.updateMany(
             { _id: { $in: bill.orders } },
@@ -404,56 +402,10 @@ const payRestaurantBill = async (req, res) => {
             .populate("table", "tableNumber capacity status")
             .populate("orders");
 
-        // Automatically send receipt after payment is saved.
         const notifications = {
             sms: "skipped",
-            whatsapp: "skipped",
+            whatsapp: "manual",
         };
-
-        if (updatedBill.customerPhone) {
-            const message =
-                `Payment Successful - Restaurant Bill\n` +
-                `Bill No: ${updatedBill.billNumber}\n` +
-                `Customer: ${updatedBill.customerName || "Customer"}\n` +
-                `Table: ${updatedBill.table?.tableNumber || "N/A"}\n` +
-                `Subtotal: Rs. ${Number(updatedBill.subtotal || 0).toFixed(2)}\n` +
-                `GST: Rs. ${Number(updatedBill.taxAmount || 0).toFixed(2)}\n` +
-                `Discount: Rs. ${Number(updatedBill.discountAmount || 0).toFixed(2)}\n` +
-                `Total Paid: Rs. ${Number(updatedBill.paidAmount || 0).toFixed(2)}\n` +
-                `Payment Method: ${updatedBill.paymentMethod}\n` +
-                `Thank you for visiting us!`;
-
-            const [smsResult, whatsappResult] = await Promise.allSettled([
-                sendSMS(updatedBill.customerPhone, message),
-                sendWhatsAppText(updatedBill.customerPhone, message),
-            ]);
-
-            notifications.sms =
-                smsResult.status === "fulfilled" ? "accepted" : "failed";
-
-            notifications.whatsapp =
-                whatsappResult.status === "fulfilled" ? "accepted" : "failed";
-
-            if (smsResult.status === "fulfilled") {
-                console.log("SMS accepted:", smsResult.value.sid);
-            } else {
-                console.error("SMS failed:", smsResult.reason.message);
-            }
-
-            if (whatsappResult.status === "fulfilled") {
-                console.log("WhatsApp accepted:", whatsappResult.value.sid);
-            } else {
-                console.error(
-                    "WhatsApp failed:",
-                    whatsappResult.reason.message
-                );
-            }
-        } else {
-            console.warn(
-                "Customer phone missing for bill:",
-                updatedBill.billNumber
-            );
-        }
 
         return res.status(200).json({
             success: true,
