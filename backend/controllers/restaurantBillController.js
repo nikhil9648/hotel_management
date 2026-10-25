@@ -270,6 +270,14 @@ const createRestaurantBill = async (req, res) => {
             { $set: { billGenerated: true } }
         );
 
+        // Keep the table unavailable while payment is pending.
+if (bill.paymentStatus !== "paid") {
+    await RestaurantTable.findByIdAndUpdate(
+        selectedTableId,
+        { $set: { status: "billing" } }
+    );
+}
+
         const populatedBill = await RestaurantBill.findById(bill._id)
             .populate("table", "tableNumber capacity status")
             .populate("orders");
@@ -297,6 +305,40 @@ const createRestaurantBill = async (req, res) => {
 // ==========================================
 // GET BILL BY ID
 // ==========================================
+
+const getActiveRestaurantBillForTable = async (req, res) => {
+    try {
+        const { tableId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(tableId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid table ID.",
+            });
+        }
+
+        const bill = await RestaurantBill.findOne({
+            table: tableId,
+            paymentStatus: { $ne: "paid" },
+            status: { $ne: "paid" },
+        })
+            .populate("table", "tableNumber capacity status")
+            .populate("orders")
+            .sort({ createdAt: -1 });
+
+        return res.status(200).json({
+            success: true,
+            bill: bill || null,
+        });
+    } catch (error) {
+        console.error("Get active table bill error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to load pending bill.",
+        });
+    }
+};
 
 const getRestaurantBill = async (req, res) => {
     try {
@@ -393,10 +435,32 @@ const payRestaurantBill = async (req, res) => {
         );
 
         // Release the table.
+        // Check whether any other unpaid bill exists for this table.
+const otherPendingBill = await RestaurantBill.findOne({
+    _id: { $ne: bill._id },
+    table: bill.table,
+    paymentStatus: { $ne: "paid" },
+    status: { $ne: "paid" },
+});
+
+if (!otherPendingBill) {
+    // Release the table only after the bill has been marked paid.
+if (bill.paymentStatus === "paid" && bill.status === "paid") {
+    const otherPendingBill = await RestaurantBill.findOne({
+        _id: { $ne: bill._id },
+        table: bill.table,
+        paymentStatus: { $ne: "paid" },
+        status: { $ne: "paid" },
+    });
+
+    if (!otherPendingBill) {
         await RestaurantTable.findByIdAndUpdate(
             bill.table,
             { $set: { status: "available" } }
         );
+    }
+}
+}
 
         const updatedBill = await RestaurantBill.findById(bill._id)
             .populate("table", "tableNumber capacity status")
@@ -741,4 +805,5 @@ module.exports = {
     generateRestaurantBillPDF,
     getAllRestaurantBills,
     getRestaurantDashboard,
+getActiveRestaurantBillForTable,
 };

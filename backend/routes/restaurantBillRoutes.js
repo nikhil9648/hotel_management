@@ -7,6 +7,7 @@ const {
     generateRestaurantBillPDF,
     getAllRestaurantBills,
     getRestaurantDashboard,
+    getActiveRestaurantBillForTable,
 } = require("../controllers/restaurantBillController");
 
 const {
@@ -140,5 +141,10 @@ router.get(
     getRestaurantBill
 );
 
+router.get(
+    "/table/:tableId/active",
+    protect,
+    getActiveRestaurantBillForTable
+);
 
 module.exports = router;
