@@ -223,6 +223,21 @@
 .workspace-content :where(.text-xs) { font-size: 12px!important; }
 .workspace-content :where(.text-sm) { font-size: 14px!important; }
 .workspace-content :where(.text-base) { font-size: 16px!important; }
+/* Page roots inside a role workspace are layout frames, not extra cards. */
+.workspace-content > :where(main,div).min-h-screen {
+  min-height: 0!important;
+  margin: 0!important;
+  padding: 0!important;
+  background: transparent!important;
+  border: 0!important;
+  border-radius: 0!important;
+  box-shadow: none!important;
+}
+.workspace-content > :where(main,div).min-h-screen > .mx-auto[class*="max-w-"] {
+  width: 100%!important;
+  max-width: none!important;
+  margin-inline: 0!important;
+}
 .workspace-content :where(.bg-white,.bg-gray-50,.bg-gray-100,.bg-gray-200,.bg-slate-50,.bg-slate-100) {
   border: 1px solid var(--border)!important;
   border-radius: var(--workspace-radius)!important;
@@ -313,6 +328,7 @@
     transition-duration: .01ms!important;
   }
 }
+
 
 
 
