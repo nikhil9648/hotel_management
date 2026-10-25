@@ -8,30 +8,30 @@ const TAX_RATE = 0.18;
 const styles = {
   page: {
     padding: "24px",
-    fontFamily: "Arial, sans-serif",
-    background: "#f5f6fa",
+    fontFamily: "DM Sans, sans-serif",
+    background: "var(--canvas)",
     minHeight: "100vh",
-    color: "#222",
+    color: "var(--text)",
   },
   card: {
-    background: "#fff",
+    background: "var(--surface)",
     padding: "24px",
-    borderRadius: "12px",
+    borderRadius: "16px",
     marginBottom: "22px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.07)",
+    boxShadow: "var(--shadow)",
   },
   input: {
     padding: "11px",
-    border: "1px solid #ccc",
-    borderRadius: "6px",
+    border: "1px solid var(--border)",
+    borderRadius: "10px",
     width: "100%",
     boxSizing: "border-box",
   },
   button: {
     padding: "11px 16px",
     border: "none",
-    borderRadius: "6px",
-    color: "#fff",
+    borderRadius: "10px",
+    color: "var(--gold-button-text)",
     cursor: "pointer",
     fontWeight: "bold",
   },
@@ -1245,3 +1245,4 @@ resetCoupon();
     </div>
   );
 }
+

@@ -1,80 +1,39 @@
-
 import React from "react";
 import { NavLink, Outlet, Navigate, useNavigate } from "react-router-dom";
+import { ClipboardList, LayoutDashboard, LogOut, Armchair, Utensils } from "lucide-react";
 
 const menuItems = [
-    { label: "Dashboard", path: "/waiter", icon: "📊" },
-    { label: "Tables", path: "/waiter/tables", icon: "🪑" },
-    { label: "Create Order", path: "/waiter/create-order", icon: "🍽️" },
-    { label: "Active Orders", path: "/waiter/orders", icon: "📋" },
+  { label: "Dashboard", path: "/waiter", icon: LayoutDashboard },
+  { label: "Tables", path: "/waiter/tables", icon: Armchair },
+  { label: "Create Order", path: "/waiter/create-order", icon: Utensils },
+  { label: "Active Orders", path: "/waiter/orders", icon: ClipboardList },
 ];
 
 export default function WaiterLayout() {
-    const navigate = useNavigate();
-
-    let user = null;
-
-    try {
-        user = JSON.parse(localStorage.getItem("user") || "null");
-    } catch {
-        user = null;
-    }
-
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-        return <Navigate to="/" replace />;
-    }
-
-    if (user?.role !== "waiter") {
-        return <Navigate to="/" replace />;
-    }
-
-    const logout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        navigate("/", { replace: true });
-        window.location.reload();
-    };
-
-    return (
-        <div className="flex min-h-screen bg-slate-100">
-            <aside className="w-64 shrink-0 bg-slate-900 p-5 text-white">
-                <h1 className="mb-8 text-xl font-bold">
-                    🍽️ Waiter Panel
-                </h1>
-
-                <nav className="space-y-2">
-                    {menuItems.map((item) => (
-                        <NavLink
-                            key={item.path}
-                            to={item.path}
-                            end={item.path === "/waiter"}
-                            className={({ isActive }) =>
-                                `flex items-center gap-3 rounded-lg px-4 py-3 ${
-                                    isActive
-                                        ? "bg-blue-600 text-white"
-                                        : "text-slate-300 hover:bg-slate-800"
-                                }`
-                            }
-                        >
-                            <span>{item.icon}</span>
-                            <span>{item.label}</span>
-                        </NavLink>
-                    ))}
-                </nav>
-
-                <button
-                    onClick={logout}
-                    className="mt-10 w-full rounded-lg bg-red-600 px-4 py-3 hover:bg-red-700"
-                >
-                    Logout
-                </button>
-            </aside>
-
-            <main className="min-w-0 flex-1 p-6">
-                <Outlet />
-            </main>
-        </div>
-    );
+  const navigate = useNavigate();
+  let user = null;
+  try { user = JSON.parse(localStorage.getItem("user") || "null"); } catch { user = null; }
+  if (!localStorage.getItem("token")) return <Navigate to="/" replace />;
+  if (user?.role !== "waiter") return <Navigate to="/" replace />;
+  const logout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/", { replace: true });
+    window.location.reload();
+  };
+  return (
+    <div className="workspace-layout workspace-waiter-layout">
+      <aside className="workspace-sidebar">
+        <div className="workspace-brand"><h1><span><Utensils size={17} /></span> Service team</h1><p>Guest experience</p></div>
+        <nav className="workspace-nav" aria-label="Waiter navigation">
+          {menuItems.map(({ label, path, icon: Icon }) => <NavLink key={path} to={path} end={path === "/waiter"} className={({ isActive }) => `workspace-nav-link${isActive ? " active" : ""}`}><span><Icon /></span><span>{label}</span></NavLink>)}
+        </nav>
+        <div className="workspace-logout-wrap"><button onClick={logout} className="workspace-logout"><LogOut size={16} /> Sign out</button></div>
+      </aside>
+      <main className="workspace-main">
+        <header className="workspace-topbar"><div><h2>Service workspace</h2><p>Welcome back, {user?.name || "Service team"}</p></div><span className="workspace-role-pill">Waiter</span></header>
+        <div className="workspace-content"><Outlet /></div>
+      </main>
+    </div>
+  );
 }
