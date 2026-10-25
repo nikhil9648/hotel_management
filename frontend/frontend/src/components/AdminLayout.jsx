@@ -23,6 +23,7 @@ const menuItems = [
     { label: "Product Billing", path: "/admin/general-pos" },
     { label: "General History", path: "/admin/general-bill-history" },
     { label: "Add POS Product", path: "/admin/general-products" },
+    { label: "Create Event", path: "/admin/events", icon: "📑" },
 ];
 
 export default function AdminLayout() {

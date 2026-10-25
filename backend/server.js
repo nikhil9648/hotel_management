@@ -41,6 +41,11 @@ const couponRoutes = require("./routes/couponRoutes");
 const restaurantPaymentRoutes = require("./routes/restaurantPaymentRoutes");
 const deliveryRoutes = require("./routes/deliveryRoutes");
 const deliveryBoyRoutes = require("./routes/deliveryBoyRoutes");
+const eventRoutes = require("./routes/eventRoutes");
+const eventRegistrationRoutes = require("./routes/eventRegistrationRoutes");
+
+
+
 
 
 
@@ -127,6 +132,10 @@ app.use("/api/menu", menuRoutes);
 app.use("/api/tables", tableRoutes);
 
 app.use("/api/delivery-boys", deliveryBoyRoutes);
+
+app.use("/api/events", eventRoutes);
+
+app.use("/api/event-registrations", eventRegistrationRoutes);
 
 app.use(
     "/api/restaurant-orders",

@@ -59,6 +59,7 @@ const getAdminDashboard = async (req, res) => {
             "waiter",
             "kitchen",
             "accountant",
+            "staff",
             "hr",
             "delivery_boy",
         ];
@@ -271,6 +272,7 @@ const createStaff = async (req, res) => {
             "kitchen",
             "accountant",
             "hr",
+            "staff",
             "delivery_boy",
         
         ];
@@ -358,6 +360,8 @@ const getAllStaff = async (req, res) => {
                     "waiter",
                     "kitchen",
                     "accountant",
+                    "staff",
+                    "delivery_boy",
                     "hr",
                 ],
             },
@@ -401,6 +405,8 @@ const getStaffById = async (req, res) => {
             "waiter",
             "kitchen",
             "accountant",
+            "staff",
+            "delivery_boy",
             "hr",
         ];
 
@@ -455,6 +461,8 @@ const updateStaff = async (req, res) => {
             "waiter",
             "kitchen",
             "accountant",
+            "staff",
+            "delivery_boy",
             "hr",
         ];
 
@@ -537,6 +545,8 @@ const deleteStaff = async (req, res) => {
             "kitchen",
             "accountant",
             "hr",
+            "staff",
+            "delivery_boy",
         ];
 
         if (!staffRoles.includes(staff.role)) {

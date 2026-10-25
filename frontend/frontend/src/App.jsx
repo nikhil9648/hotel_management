@@ -1,12 +1,5 @@
-
 import { useEffect, useState } from "react";
-import {
-    Routes,
-    Route,
-    Navigate,
-    Link,
-    useLocation,
-} from "react-router-dom";
+import { Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
 
 // Public and Customer Pages
 import Home from "./pages/Home";
@@ -39,6 +32,7 @@ import GeneralPOS from "./pages/admin/GeneralPOS";
 import GeneralProductManagement from "./pages/admin/GeneralProductManagement";
 import GeneralBillHistory from "./pages/admin/GeneralBillHistory";
 import RestaurantTables from "./pages/admin/RestaurantTables";
+import AdminEvents from "./pages/admin/AdminEvents";
 
 // Kitchen and Reception
 import KitchenKOT from "./pages/KitchenKOT";
@@ -59,486 +53,402 @@ import WaiterOrders from "./waiter/WaiterOrders";
 // Delivery Boy
 import DeliveryBoyDashboard from "./delivery/DeliveryBoyDashboard";
 
+// Event QR Staff
+import StaffDashboard from "./pages/staff/StaffDashboard";
+import EventScanner from "./pages/staff/EventScanner";
+import EventRegistration from "./pages/EventRegistration";
+
 function App() {
-    const location = useLocation();
+  const location = useLocation();
 
-    // Theme
-    const [theme, setTheme] = useState(() =>
-        localStorage.getItem("hotel-theme") === "light"
-            ? "light"
-            : "dark"
-    );
+  // Theme
+  const [theme, setTheme] = useState(() =>
+    localStorage.getItem("hotel-theme") === "light" ? "light" : "dark",
+  );
 
-    useEffect(() => {
-        document.documentElement.dataset.theme = theme;
-        localStorage.setItem("hotel-theme", theme);
-    }, [theme]);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("hotel-theme", theme);
+  }, [theme]);
 
-    // Login state
-    const [isLoggedIn, setIsLoggedIn] = useState(() =>
-        Boolean(localStorage.getItem("token"))
-    );
+  // Login state
+  const [isLoggedIn, setIsLoggedIn] = useState(() =>
+    Boolean(localStorage.getItem("token")),
+  );
 
-    // Current user
-    const [currentUser, setCurrentUser] = useState(() => {
-        try {
-            return JSON.parse(localStorage.getItem("user") || "null");
-        } catch {
-            return null;
-        }
-    });
+  // Current user
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  });
 
-    // Normalize role
-    const normalizedRole = String(currentUser?.role || "")
-        .trim()
-        .toLowerCase()
-        .replace(/[\s-]+/g, "_");
+  // Normalize role
+  const normalizedRole = String(currentUser?.role || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
 
-    const isCustomer = ["customer", "user"].includes(normalizedRole);
+  const isCustomer = ["customer", "user"].includes(normalizedRole);
 
-    // Dashboard path according to role
-    const getDashboardPath = (role) => {
-        const normalized = String(role || "")
-            .trim()
-            .toLowerCase()
-            .replace(/[\s-]+/g, "_");
+  // Dashboard path according to role
+  const getDashboardPath = (role) => {
+    const normalized = String(role || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_");
 
-        const dashboardPaths = {
-            admin: "/admin",
-            manager: "/admin",
-            receptionist: "/reception/billing",
-            waiter: "/waiter",
-            kitchen: "/kitchen",
-            accountant: "/admin",
-            hr: "/admin",
-            delivery_boy: "/delivery-dashboard",
-            customer: "/",
-            user: "/",
-        };
-
-        return dashboardPaths[normalized] || "/";
+    const dashboardPaths = {
+      admin: "/admin",
+      manager: "/admin",
+      receptionist: "/reception/billing",
+      waiter: "/waiter",
+      kitchen: "/kitchen",
+      staff: "/staff",
+      accountant: "/admin",
+      hr: "/admin",
+      delivery_boy: "/delivery-dashboard",
+      customer: "/",
+      user: "/",
     };
 
-    // Login callback
-    const handleLogin = (user) => {
-        let savedUser = user;
+    return dashboardPaths[normalized] || "/";
+  };
 
-        if (!savedUser) {
-            try {
-                savedUser = JSON.parse(
-                    localStorage.getItem("user") || "null"
-                );
-            } catch {
-                savedUser = null;
-            }
-        }
+  // Login callback
+  const handleLogin = (user) => {
+    let savedUser = user;
 
-        setCurrentUser(savedUser);
-        setIsLoggedIn(Boolean(localStorage.getItem("token")));
-    };
+    if (!savedUser) {
+      try {
+        savedUser = JSON.parse(localStorage.getItem("user") || "null");
+      } catch {
+        savedUser = null;
+      }
+    }
 
-    // Logout
-    const handleLogout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+    setCurrentUser(savedUser);
+    setIsLoggedIn(Boolean(localStorage.getItem("token")));
+  };
 
-        setCurrentUser(null);
-        setIsLoggedIn(false);
+  // Logout
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
 
-        window.location.href = "/";
-    };
+    setCurrentUser(null);
+    setIsLoggedIn(false);
 
-    // Theme toggle
-    const toggleTheme = (
-        <button
-            type="button"
-            className="theme-toggle"
-            aria-label={`Switch to ${
-                theme === "dark" ? "light" : "dark"
-            } theme`}
-            aria-pressed={theme === "light"}
-            onClick={() =>
-                setTheme((current) =>
-                    current === "dark" ? "light" : "dark"
-                )
-            }
-        >
-            <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            >
-                {theme === "dark" ? (
-                    <>
-                        <circle cx="12" cy="12" r="4" />
-                        <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
-                    </>
-                ) : (
-                    <path d="M20.9 13.1A8.5 8.5 0 0 1 10.9 3.1 8.5 8.5 0 1 0 20.9 13.1Z" />
-                )}
-            </svg>
+    window.location.href = "/";
+  };
+
+  // Theme toggle
+  const toggleTheme = (
+    <button
+      type="button"
+      className="theme-toggle"
+      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+      aria-pressed={theme === "light"}
+      onClick={() =>
+        setTheme((current) => (current === "dark" ? "light" : "dark"))
+      }
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {theme === "dark" ? (
+          <>
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
+          </>
+        ) : (
+          <path d="M20.9 13.1A8.5 8.5 0 0 1 10.9 3.1 8.5 8.5 0 1 0 20.9 13.1Z" />
+        )}
+      </svg>
+
+      <span>{theme === "dark" ? "Light theme" : "Dark theme"}</span>
+    </button>
+  );
+
+  // Protect customer-only pages
+  const customerRoute = (element) => {
+    if (!isLoggedIn) {
+      return (
+        <Navigate to="/login" replace state={{ from: location.pathname }} />
+      );
+    }
+
+    if (!isCustomer) {
+      return <Navigate to={getDashboardPath(normalizedRole)} replace />;
+    }
+
+    return element;
+  };
+
+  // Protect role-specific staff pages
+  const staffRoute = (element, allowedRoles) => {
+    if (!isLoggedIn) {
+      return (
+        <Navigate to="/login" replace state={{ from: location.pathname }} />
+      );
+    }
+
+    if (!allowedRoles.includes(normalizedRole)) {
+      return <Navigate to={getDashboardPath(normalizedRole)} replace />;
+    }
+
+    return element;
+  };
+
+  return (
+    <div
+      className={`app-root min-h-screen${isCustomer ? " customer-app" : ""}`}
+    >
+      {/* Staff Navbar */}
+      {isLoggedIn && !isCustomer && (
+        <header className="app-topbar">
+          <Link to="/" className="brand-lockup">
+            <span className="brand-mark" aria-hidden="true">
+              H
+            </span>
 
             <span>
-                {theme === "dark" ? "Light theme" : "Dark theme"}
+              <strong>Hotel &amp; Restaurant</strong>
+              <small>HOSPITALITY MANAGEMENT</small>
             </span>
-        </button>
-    );
+          </Link>
 
-    // Protect customer-only pages
-    const customerRoute = (element) => {
-        if (!isLoggedIn) {
-            return (
-                <Navigate
-                    to="/login"
-                    replace
-                    state={{ from: location.pathname }}
-                />
-            );
-        }
+          <div className="app-account">
+            <span className="account-avatar" aria-hidden="true">
+              {(
+                currentUser?.name ||
+                currentUser?.fullName ||
+                currentUser?.email ||
+                "U"
+              )
+                .charAt(0)
+                .toUpperCase()}
+            </span>
 
-        if (!isCustomer) {
-            return (
-                <Navigate
-                    to={getDashboardPath(normalizedRole)}
-                    replace
-                />
-            );
-        }
+            <span className="account-copy">
+              {currentUser?.name ||
+                currentUser?.fullName ||
+                currentUser?.email ||
+                "User"}
 
-        return element;
-    };
+              <small>{currentUser?.role || "User"}</small>
+            </span>
 
-    // Protect staff pages
-    const staffRoute = (element, allowedRoles) => {
-        if (!isLoggedIn) {
-            return (
-                <Navigate
-                    to="/login"
-                    replace
-                    state={{ from: location.pathname }}
-                />
-            );
-        }
+            {toggleTheme}
 
-        if (!allowedRoles.includes(normalizedRole)) {
-            return (
-                <Navigate
-                    to={getDashboardPath(normalizedRole)}
-                    replace
-                />
-            );
-        }
-
-        return element;
-    };
-
-    return (
-        <div
-            className={`app-root min-h-screen${
-                isCustomer ? " customer-app" : ""
-            }`}
-        >
-            {/* Staff Navbar */}
-            {isLoggedIn && !isCustomer && (
-                <header className="app-topbar">
-                    <Link to="/" className="brand-lockup">
-                        <span className="brand-mark" aria-hidden="true">
-                            H
-                        </span>
-
-                        <span>
-                            <strong>Hotel &amp; Restaurant</strong>
-                            <small>HOSPITALITY MANAGEMENT</small>
-                        </span>
-                    </Link>
-
-                    <div className="app-account">
-                        <span
-                            className="account-avatar"
-                            aria-hidden="true"
-                        >
-                            {(
-                                currentUser?.name ||
-                                currentUser?.fullName ||
-                                currentUser?.email ||
-                                "U"
-                            )
-                                .charAt(0)
-                                .toUpperCase()}
-                        </span>
-
-                        <span className="account-copy">
-                            {currentUser?.name ||
-                                currentUser?.fullName ||
-                                currentUser?.email ||
-                                "User"}
-
-                            <small>{currentUser?.role || "User"}</small>
-                        </span>
-
-                        {toggleTheme}
-
-                        <button
-                            type="button"
-                            onClick={handleLogout}
-                            className="logout-button"
-                        >
-                            Logout
-                        </button>
-                    </div>
-                </header>
-            )}
-
-            <div
-                className={
-                    isCustomer && isLoggedIn
-                        ? "customer-experience"
-                        : "app-content"
-                }
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="logout-button"
             >
-                <Routes>
-                    {/* Public Homepage */}
-                    <Route
-                        path="/"
-                        element={
-                            <Home
-                                isLoggedIn={isLoggedIn}
-                                currentUser={currentUser}
-                                onLogout={handleLogout}
-                            />
-                        }
-                    />
+              Logout
+            </button>
+          </div>
+        </header>
+      )}
 
-                    {/* Login */}
-                    <Route
-                        path="/login"
-                        element={
-                            isLoggedIn ? (
-                                <Navigate
-                                    to={getDashboardPath(normalizedRole)}
-                                    replace
-                                />
-                            ) : (
-                                <Login onLogin={handleLogin} />
-                            )
-                        }
-                    />
+      <div
+        className={
+          isCustomer && isLoggedIn ? "customer-experience" : "app-content"
+        }
+      >
+        <Routes>
+          {/* Public Homepage */}
+          <Route
+            path="/"
+            element={
+              <Home
+                isLoggedIn={isLoggedIn}
+                currentUser={currentUser}
+                onLogout={handleLogout}
+              />
+            }
+          />
 
-                    {/* Signup */}
-                    <Route
-                        path="/signup"
-                        element={
-                            isLoggedIn ? (
-                                <Navigate
-                                    to={getDashboardPath(normalizedRole)}
-                                    replace
-                                />
-                            ) : (
-                                <Signup />
-                            )
-                        }
-                    />
+          {/* Login */}
+          <Route
+            path="/login"
+            element={
+              isLoggedIn ? (
+                <Navigate to={getDashboardPath(normalizedRole)} replace />
+              ) : (
+                <Login onLogin={handleLogin} />
+              )
+            }
+          />
 
-                    {/* Customer Profile */}
-                    <Route
-                        path="/profile"
-                        element={customerRoute(<Profile />)}
-                    />
+          {/* Signup */}
+          <Route
+            path="/signup"
+            element={
+              isLoggedIn ? (
+                <Navigate to={getDashboardPath(normalizedRole)} replace />
+              ) : (
+                <Signup />
+              )
+            }
+          />
 
-                    {/* Public Browsing */}
-                    <Route path="/menu" element={<Menu />} />
-                    <Route path="/rooms" element={<Rooms />} />
-                    <Route path="/contact" element={<ContactUs />} />
+          {/* Customer Profile */}
+          <Route path="/profile" element={customerRoute(<Profile />)} />
 
-                    {/* Customer Pages */}
-                    <Route
-                        path="/booking-details"
-                        element={customerRoute(<BookingDetails />)}
-                    />
+          {/* Public Browsing */}
+          <Route path="/menu" element={<Menu />} />
+          <Route path="/rooms" element={<Rooms />} />
+          <Route path="/contact" element={<ContactUs />} />
 
-                    <Route
-                        path="/book-room"
-                        element={customerRoute(<BookRoom />)}
-                    />
+          {/* Customer Pages */}
+          <Route
+            path="/booking-details"
+            element={customerRoute(<BookingDetails />)}
+          />
 
-                    <Route
-                        path="/cart"
-                        element={customerRoute(<Cart />)}
-                    />
+          <Route path="/book-room" element={customerRoute(<BookRoom />)} />
 
-                    <Route
-                        path="/checkout"
-                        element={customerRoute(<Checkout />)}
-                    />
+          <Route path="/cart" element={customerRoute(<Cart />)} />
 
-                    <Route
-                        path="/my-orders"
-                        element={customerRoute(<MyOrders />)}
-                    />
+          <Route path="/checkout" element={customerRoute(<Checkout />)} />
 
-                    <Route
-                        path="/my-bookings"
-                        element={customerRoute(<MyBookings />)}
-                    />
+          <Route path="/my-orders" element={customerRoute(<MyOrders />)} />
 
-                    {/* Payment Success */}
-                    <Route
-                        path="/payment-success"
-                        element={<PaymentSuccess />}
-                    />
+          <Route path="/my-bookings" element={customerRoute(<MyBookings />)} />
 
-                    {/* Kitchen */}
-                    <Route
-                        path="/kitchen"
-                        element={staffRoute(
-                            <KitchenLayout />,
-                            ["admin", "manager", "kitchen"]
-                        )}
-                    >
-                        <Route index element={<KitchenDashboard />} />
-                        <Route
-                            path="orders"
-                            element={<KitchenOrders />}
-                        />
-                    </Route>
+          {/* Payment Success */}
+          <Route path="/payment-success" element={<PaymentSuccess />} />
 
-                    {/* Reception */}
-                    <Route
-                        path="/reception/billing"
-                        element={staffRoute(
-                            <ReceptionBilling />,
-                            ["admin", "manager", "receptionist"]
-                        )}
-                    />
+          {/* Kitchen */}
+          <Route
+            path="/kitchen"
+            element={staffRoute(<KitchenLayout />, [
+              "admin",
+              "manager",
+              "kitchen",
+            ])}
+          >
+            <Route index element={<KitchenDashboard />} />
+            <Route path="orders" element={<KitchenOrders />} />
+          </Route>
 
-                    <Route
-                        path="/restaurant-bill-history"
-                        element={staffRoute(
-                            <RestaurantBillHistory />,
-                            ["admin", "manager", "receptionist"]
-                        )}
-                    />
+          {/* Reception */}
+          <Route
+            path="/reception/billing"
+            element={staffRoute(<ReceptionBilling />, [
+              "admin",
+              "manager",
+              "receptionist",
+            ])}
+          />
 
-                    {/* Admin */}
-                    <Route
-                        path="/admin"
-                        element={staffRoute(
-                            <AdminLayout />,
-                            ["admin", "manager"]
-                        )}
-                    >
-                        <Route index element={<AdminDashboard />} />
+          <Route
+            path="/restaurant-bill-history"
+            element={staffRoute(<RestaurantBillHistory />, [
+              "admin",
+              "manager",
+              "receptionist",
+            ])}
+          />
 
-                        <Route path="staff" element={<AdminStaff />} />
-                        <Route path="menu" element={<AdminMenu />} />
-                        <Route path="bookings" element={<AdminBookings />} />
-                        <Route path="rooms" element={<AdminRooms />} />
+          {/* Admin */}
+          <Route
+            path="/admin"
+            element={staffRoute(<AdminLayout />, ["admin", "manager"])}
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="staff" element={<AdminStaff />} />
+            <Route path="menu" element={<AdminMenu />} />
+            <Route path="bookings" element={<AdminBookings />} />
+            <Route path="rooms" element={<AdminRooms />} />
 
-                        <Route
-                            path="room-types"
-                            element={<AdminRoomTypes />}
-                        />
+            <Route path="room-types" element={<AdminRoomTypes />} />
 
-                        <Route
-                            path="room-booking"
-                            element={<AdminRoomBooking />}
-                        />
+            <Route path="room-booking" element={<AdminRoomBooking />} />
 
-                        <Route
-                            path="restaurant-orders"
-                            element={<AdminRestaurantOrders />}
-                        />
+            <Route
+              path="restaurant-orders"
+              element={<AdminRestaurantOrders />}
+            />
 
-                        {/* Online Delivery Orders */}
-                        <Route
-                            path="online-order"
-                            element={<OnlineOrders />}
-                        />
+            <Route path="online-order" element={<OnlineOrders />} />
 
-                        {/* General POS */}
-                        <Route
-                            path="general-pos"
-                            element={<GeneralPOS />}
-                        />
+            <Route path="general-pos" element={<GeneralPOS />} />
 
-                        <Route
-                            path="general-products"
-                            element={<GeneralProductManagement />}
-                        />
+            <Route
+              path="general-products"
+              element={<GeneralProductManagement />}
+            />
 
-                        <Route
-                            path="general-bill-history"
-                            element={<GeneralBillHistory />}
-                        />
+            <Route
+              path="general-bill-history"
+              element={<GeneralBillHistory />}
+            />
 
-                        {/* Restaurant Tables */}
-                        <Route
-                            path="restaurant-tables"
-                            element={<RestaurantTables />}
-                        />
+            <Route path="events" element={<AdminEvents />} />
 
-                        {/* Kitchen and Billing */}
-                        <Route path="kitchen" element={<KitchenKOT />} />
+            <Route path="restaurant-tables" element={<RestaurantTables />} />
 
-                        <Route
-                            path="billing"
-                            element={<ReceptionBilling />}
-                        />
+            <Route path="kitchen" element={<KitchenKOT />} />
 
-                        <Route
-                            path="bill-history"
-                            element={<RestaurantBillHistory />}
-                        />
-                    </Route>
+            <Route path="billing" element={<ReceptionBilling />} />
 
-                    {/* Waiter */}
-                    <Route
-                        path="/waiter"
-                        element={staffRoute(
-                            <WaiterLayout />,
-                            ["admin", "manager", "waiter"]
-                        )}
-                    >
-                        <Route index element={<WaiterDashboard />} />
+            <Route path="bill-history" element={<RestaurantBillHistory />} />
+          </Route>
 
-                        <Route
-                            path="tables"
-                            element={<WaiterTables />}
-                        />
+          {/* Waiter */}
+          <Route
+            path="/waiter"
+            element={staffRoute(<WaiterLayout />, [
+              "admin",
+              "manager",
+              "waiter",
+            ])}
+          >
+            <Route index element={<WaiterDashboard />} />
+            <Route path="tables" element={<WaiterTables />} />
+            <Route path="create-order" element={<CreateOrder />} />
+            <Route path="orders" element={<WaiterOrders />} />
+          </Route>
 
-                        <Route
-                            path="create-order"
-                            element={<CreateOrder />}
-                        />
+          {/* Delivery Boy Dashboard */}
+          <Route
+            path="/delivery-dashboard"
+            element={staffRoute(<DeliveryBoyDashboard />, ["delivery_boy"])}
+          />
 
-                        <Route
-                            path="orders"
-                            element={<WaiterOrders />}
-                        />
-                    </Route>
+          {/* Event QR Staff Dashboard */}
+          <Route
+            path="/staff"
+            element={staffRoute(<StaffDashboard />, ["staff"])}
+          />
 
-                    {/* Delivery Boy Dashboard */}
-                    <Route
-                        path="/delivery-dashboard"
-                        element={staffRoute(
-                            <DeliveryBoyDashboard />,
-                            ["delivery_boy"]
-                        )}
-                    />
+          <Route
+            path="/staff/event-scanner"
+            element={staffRoute(<EventScanner />, ["staff"])}
+          />
 
-                    {/* Invalid URL */}
-                    <Route
-                        path="*"
-                        element={<Navigate to="/" replace />}
-                    />
-                </Routes>
-            </div>
-        </div>
-    );
+          <Route
+            path="/events/:eventId/register"
+            element={<EventRegistration />}
+          />
+
+          {/* Invalid URL */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </div>
+  );
 }
 
 export default App;

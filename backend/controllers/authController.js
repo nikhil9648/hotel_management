@@ -16,7 +16,7 @@ const generateToken = (userId) => {
             expiresIn: "7d",
         }
     );
-};
+}; 
 
 // ========================================
 // Register User
