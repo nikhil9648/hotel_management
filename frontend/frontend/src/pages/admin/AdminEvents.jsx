@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { QRCodeSVG } from "qrcode.react";
+import { Edit2, QrCode } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -602,21 +603,25 @@ const AdminEvents = () => {
                       </td>
 
                       <td className="p-3">
-                        <div className="flex min-w-56 flex-col gap-2">
+                        <div className="event-actions">
                           <button
                             type="button"
                             onClick={() => openEditForm(item)}
-                            className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                            className="event-icon-action"
+                            aria-label={`Edit ${item.title}`}
+                            title="Edit event"
                           >
-                            Edit Event
+                            <Edit2 size={18} aria-hidden="true" />
                           </button>
 
                           <button
                             type="button"
                             onClick={() => setSelectedEvent(item)}
-                            className="rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700"
+                            className="event-icon-action"
+                            aria-label={`Show QR code for ${item.title}`}
+                            title="Show QR code"
                           >
-                            Show QR
+                            <QrCode size={19} aria-hidden="true" />
                           </button>
 
                           <button
