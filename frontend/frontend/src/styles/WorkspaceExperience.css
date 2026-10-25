@@ -332,3 +332,148 @@
 
 
 
+
+/* A theme switch remains available on public and customer pages too. */
+.theme-toggle-float {
+  position: fixed;
+  z-index: 120;
+  right: 20px;
+  bottom: 22px;
+  min-height: 46px;
+  padding: 0 15px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+}
+.theme-toggle-float:hover { border-color: var(--gold); }
+
+/* Customer pages contain some intentionally editorial colors. Their data
+   surfaces still follow the selected theme so controls/cards never stay white. */
+:root[data-theme="dark"] .cx-page {
+  --cx-ink: var(--text);
+  --cx-muted: var(--text-secondary);
+  --cx-line: var(--border);
+  --cx-paper: var(--surface);
+  --cx-cream: var(--canvas);
+  background: var(--canvas)!important;
+  color: var(--text)!important;
+}
+:root[data-theme="dark"] .cx-page :where(
+  [class*="card"], [class*="panel"], [class*="summary"], [class*="form"], [class*="searchbox"],
+  [class*="links"] > a
+) {
+  color: var(--text)!important;
+  background-color: var(--surface)!important;
+  border-color: var(--border)!important;
+  box-shadow: var(--shadow);
+}
+:root[data-theme="dark"] .cx-page :where(
+  h2, h3, .cx-topbar nav a, .cx-brand, .cx-result-count,
+  .cx-room-amenities, .cx-order-meta, .cx-stay-details, .cx-profile-detail
+) { color: var(--text-secondary)!important; }
+:root[data-theme="dark"] .cx-page :where(
+  [class*="card"], [class*="panel"], [class*="summary"], [class*="form"], [class*="searchbox"],
+  [class*="links"] > a
+) :where(p,small,label) { color: var(--text-secondary)!important; }
+:root[data-theme="dark"] .cx-page :where(h2,h3) { color: var(--text)!important; }
+:root[data-theme="dark"] .cx-page :where(input,select,textarea) {
+  color: var(--text)!important;
+  background: var(--control-surface)!important;
+  border-color: var(--border)!important;
+}
+:root[data-theme="dark"] .cx-login-page { color: var(--text); background: var(--canvas); }
+:root[data-theme="dark"] .cx-login-form-side { background: var(--surface); }
+:root[data-theme="dark"] .cx-login-form-wrap h2,
+:root[data-theme="dark"] .cx-login-form>label { color: var(--text)!important; }
+:root[data-theme="dark"] .cx-login-subtitle,
+:root[data-theme="dark"] .cx-signup-form-wrap>p { color: var(--text-secondary)!important; }
+:root[data-theme="dark"] .cx-input-wrap {
+  color: var(--text-muted);
+  background: var(--control-surface);
+  border-color: var(--border);
+}
+:root[data-theme="dark"] .cx-input-wrap input {
+  color: var(--text)!important;
+  background: transparent!important;
+}
+:root[data-theme="dark"] .cx-input-wrap input::placeholder { color: var(--text-muted); }
+
+/* Legacy inline-style staff screens also consume the global theme tokens. */
+:root[data-theme="dark"] .app-content [style*="background: rgb(255, 255, 255)"] {
+  color: var(--text)!important;
+  background: var(--surface)!important;
+  border-color: var(--border)!important;
+}
+:root[data-theme="dark"] .app-content [style*="background: rgb(248, 250, 252)"],
+:root[data-theme="dark"] .app-content [style*="background: rgb(245, 247, 251)"],
+:root[data-theme="dark"] .app-content [style*="background: rgb(245, 246, 250)"] {
+  color: var(--text)!important;
+  background: var(--canvas)!important;
+}
+:root[data-theme="dark"] .app-content [style*="background: rgb(220, 252, 231)"],
+:root[data-theme="dark"] .app-content [style*="background: rgb(232, 245, 233)"],
+:root[data-theme="dark"] .app-content [style*="background: rgb(236, 253, 245)"] {
+  color: var(--success)!important;
+  background: color-mix(in srgb, var(--success) 14%, var(--surface))!important;
+  border-color: color-mix(in srgb, var(--success) 35%, var(--border))!important;
+}
+:root[data-theme="dark"] .app-content [style*="background: rgb(254, 226, 226)"],
+:root[data-theme="dark"] .app-content [style*="background: rgb(254, 242, 242)"],
+:root[data-theme="dark"] .app-content [style*="background: rgb(255, 235, 238)"] {
+  color: var(--danger)!important;
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface))!important;
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border))!important;
+}
+:root[data-theme="dark"] .app-content [style*="background: rgb(219, 234, 254)"] {
+  color: var(--info)!important;
+  background: color-mix(in srgb, var(--info) 16%, var(--surface))!important;
+  border-color: color-mix(in srgb, var(--info) 32%, var(--border))!important;
+}
+:root[data-theme="dark"] .app-content [style*="background: rgb(254, 243, 199)"] {
+  color: var(--warning)!important;
+  background: color-mix(in srgb, var(--warning) 15%, var(--surface))!important;
+  border-color: color-mix(in srgb, var(--warning) 32%, var(--border))!important;
+}
+:root[data-theme="dark"] .app-content [style*="color: rgb(30, 41, 59)"],
+:root[data-theme="dark"] .app-content [style*="color: rgb(23, 32, 51)"],
+:root[data-theme="dark"] .app-content [style*="color: rgb(34, 34, 34)"],
+:root[data-theme="dark"] .app-content [style*="color: rgb(100, 116, 139)"],
+:root[data-theme="dark"] .app-content [style*="color: rgb(100, 100, 100)"] {
+  color: var(--text-secondary)!important;
+}
+:root[data-theme="dark"] .app-content [style*="background: rgb(37, 99, 235)"],
+:root[data-theme="dark"] .app-content [style*="background: rgb(21, 128, 61)"],
+:root[data-theme="dark"] .app-content [style*="background: rgb(46, 125, 50)"] {
+  color: var(--gold-button-text)!important;
+  background: var(--gold)!important;
+}
+
+@media(max-width:720px) {
+  .theme-toggle-float { right: 14px; bottom: calc(86px + env(safe-area-inset-bottom)); min-height: 44px; padding: 0 12px; }
+}
+
+
+
+
+.add-form-trigger {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 17px;
+  border: 1px solid color-mix(in srgb, var(--gold) 36%, var(--border));
+  border-radius: 12px;
+  color: var(--gold-button-text)!important;
+  background: var(--gold)!important;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--gold) 20%, transparent);
+  font-size: 14px;
+  font-weight: 750;
+  transition: transform .18s var(--workspace-ease), box-shadow .18s, background .18s;
+}
+.add-form-trigger:hover { transform: translateY(-2px); box-shadow: 0 12px 24px color-mix(in srgb, var(--gold) 28%, transparent); }
+.add-form-trigger svg { width: 18px; height: 18px; }
+.add-form-panel { animation: workspace-form-in .28s var(--workspace-ease) both; }
+@keyframes workspace-form-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }

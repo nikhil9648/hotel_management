@@ -30,6 +30,7 @@ const getDateTimeInput = (value) => {
 
 const AdminEvents = () => {
   const [form, setForm] = useState(initialForm);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -135,6 +136,7 @@ const AdminEvents = () => {
       setMessage(response.data.message || "Event created successfully.");
 
       setForm(initialForm);
+      setShowCreateForm(false);
       await loadEvents();
     } catch (err) {
       setError(
@@ -363,11 +365,15 @@ const AdminEvents = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-4 text-gray-800 sm:p-6">
       <div className="mx-auto max-w-7xl">
-        <h1 className="text-3xl font-bold">Event Management</h1>
-
-        <p className="mt-2 text-gray-600">
-          Create and manage hotel events and ticket registrations.
-        </p>
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Event Management</h1>
+            <p className="mt-2 text-gray-600">Create and manage hotel events and ticket registrations.</p>
+          </div>
+          <button type="button" className="add-form-trigger" onClick={() => setShowCreateForm((open) => !open)}>
+            {showCreateForm ? "Close form" : "+ Create Event"}
+          </button>
+        </header>
 
         {message && (
           <div className="mt-4 break-words rounded-lg bg-green-100 p-3 text-green-800">
@@ -382,9 +388,9 @@ const AdminEvents = () => {
         )}
 
         {/* Create Event Form */}
-        <form
+        {showCreateForm && <form
           onSubmit={handleSubmit}
-          className="mt-6 space-y-5 rounded-xl bg-white p-5 shadow sm:p-6"
+          className="add-form-panel mt-6 space-y-5 rounded-xl bg-white p-5 shadow sm:p-6"
         >
           <h2 className="text-xl font-semibold">Create New Event</h2>
 
@@ -529,7 +535,7 @@ const AdminEvents = () => {
           >
             {loading ? "Creating..." : "Create Event"}
           </button>
-        </form>
+        </form>}
 
         {/* Existing Events */}
         <section className="mt-8 rounded-xl bg-white p-5 shadow sm:p-6">

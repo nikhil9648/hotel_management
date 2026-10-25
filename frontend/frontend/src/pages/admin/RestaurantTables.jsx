@@ -16,6 +16,7 @@ export default function RestaurantTables() {
   const [tables, setTables] = useState([]);
   const [form, setForm] = useState({ ...initialForm });
   const [editingId, setEditingId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [removingId, setRemovingId] = useState(null);
   const [error, setError] = useState("");
@@ -62,6 +63,7 @@ export default function RestaurantTables() {
   const resetForm = () => {
     setForm({ ...initialForm });
     setEditingId(null);
+    setShowForm(false);
   };
 
   const startEdit = (table) => {
@@ -74,6 +76,7 @@ export default function RestaurantTables() {
     });
 
     setEditingId(table._id);
+    setShowForm(true);
     setError("");
     setMessage("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -183,19 +186,21 @@ export default function RestaurantTables() {
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         {/* Page heading */}
-        <header>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Restaurant Table Management
-          </h1>
-          <p className="mt-1 text-slate-500">
-            Add, update, and manage your restaurant tables.
-          </p>
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Restaurant Table Management</h1>
+            <p className="mt-1 text-slate-500">Add, update, and manage your restaurant tables.</p>
+          </div>
+          <button type="button" className="add-form-trigger" onClick={() => {
+            if (showForm || editingId) resetForm();
+            else { resetForm(); setShowForm(true); }
+          }}>{showForm || editingId ? "Close form" : "+ Add Table"}</button>
         </header>
 
         {/* Add / Edit form */}
-        <form
+        {(showForm || editingId) && <form
           onSubmit={handleSubmit}
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+          className="add-form-panel rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
         >
           <h2 className="mb-5 text-lg font-semibold">
             {editingId ? "Update Restaurant Table" : "Add New Table"}
@@ -315,7 +320,7 @@ export default function RestaurantTables() {
               </button>
             )}
           </div>
-        </form>
+        </form>}
 
         {/* Existing tables */}
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

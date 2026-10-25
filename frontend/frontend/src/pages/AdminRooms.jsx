@@ -26,6 +26,7 @@ export default function AdminRooms() {
   const [roomTypes, setRoomTypes] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState({
     status: "",
     roomType: "",
@@ -79,6 +80,7 @@ export default function AdminRooms() {
   const resetForm = () => {
     setForm(initialForm);
     setEditingId(null);
+    setShowForm(false);
   };
 
   const handleSubmit = async (e) => {
@@ -140,6 +142,7 @@ export default function AdminRooms() {
 
   const handleEdit = (room) => {
     setEditingId(room._id);
+    setShowForm(true);
     setForm({
       roomNumber: room.roomNumber || "",
       roomType: room.roomType?._id || "",
@@ -249,13 +252,14 @@ export default function AdminRooms() {
           <button
             type="button"
             onClick={() => {
-              resetForm();
+              if (showForm || editingId) resetForm();
+              else { resetForm(); setShowForm(true); }
               setError("");
               setMessage("");
             }}
-            className="rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"
+            className="add-form-trigger"
           >
-            + Add New Room
+            {showForm || editingId ? "Close form" : "+ Add New Room"}
           </button>
         </div>
 
@@ -287,7 +291,8 @@ export default function AdminRooms() {
           ))}
         </div>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        {(showForm || editingId) && (
+        <section className="add-form-panel rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-xl font-bold text-slate-800">
             {editingId ? "Edit Room" : "Create Room"}
           </h2>
@@ -404,6 +409,7 @@ export default function AdminRooms() {
             </p>
           )}
         </section>
+        )}
 
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col justify-between gap-4 border-b border-slate-200 p-5 sm:flex-row sm:items-center">

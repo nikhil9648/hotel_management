@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Plus, X } from "lucide-react";
 import axios from "axios";
 
 const API = "http://localhost:5000/api/admin/staff";
@@ -19,6 +20,7 @@ export default function AdminStaff() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [editingId, setEditingId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
 
   const token = localStorage.getItem("token");
 
@@ -52,6 +54,7 @@ export default function AdminStaff() {
   const resetForm = () => {
     setForm(initialForm);
     setEditingId(null);
+    setShowForm(false);
   };
 
   const handleSubmit = async (e) => {
@@ -91,6 +94,7 @@ export default function AdminStaff() {
 
   const handleEdit = (person) => {
     setEditingId(person._id);
+    setShowForm(true);
     setForm({
       name: person.name || "",
       email: person.email || "",
@@ -128,13 +132,23 @@ export default function AdminStaff() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">
-          Staff Management
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Staff members add, update aur manage karo.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Staff Management</h1>
+          <p className="mt-1 text-sm text-slate-500">Staff members add, update aur manage karo.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (showForm || editingId) resetForm();
+            else { resetForm(); setShowForm(true); setError(""); setMessage(""); }
+          }}
+          className="add-form-trigger"
+          aria-expanded={showForm || Boolean(editingId)}
+        >
+          {showForm || editingId ? <X size={17} /> : <Plus size={18} />}
+          {showForm || editingId ? "Close form" : "Add Staff"}
+        </button>
       </div>
 
       {error && (
@@ -149,7 +163,8 @@ export default function AdminStaff() {
         </div>
       )}
 
-      <section className="rounded-xl bg-white p-5 shadow-sm">
+      {(showForm || editingId) && (
+      <section className="add-form-panel rounded-xl bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold">
           {editingId ? "Edit Staff" : "Add New Staff"}
         </h2>
@@ -236,6 +251,7 @@ export default function AdminStaff() {
           </div>
         </form>
       </section>
+      )}
 
       <section className="overflow-hidden rounded-xl bg-white shadow-sm">
         <div className="flex items-center justify-between border-b p-5">

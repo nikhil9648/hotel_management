@@ -17,6 +17,7 @@ export default function AdminRoomTypes() {
   const [roomTypes, setRoomTypes] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
+  const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -53,6 +54,7 @@ export default function AdminRoomTypes() {
   const resetForm = () => {
     setForm(initialForm);
     setEditingId(null);
+    setShowForm(false);
   };
 
   const handleSubmit = async (e) => {
@@ -116,6 +118,7 @@ export default function AdminRoomTypes() {
 
   const handleEdit = (type) => {
     setEditingId(type._id);
+    setShowForm(true);
     setForm({
       name: type.name || "",
       description: type.description || "",
@@ -184,13 +187,15 @@ export default function AdminRoomTypes() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <header>
-          <h1 className="text-3xl font-bold text-slate-800">
-            Room Type Management
-          </h1>
-          <p className="mt-1 text-slate-500">
-            Manage room categories, pricing, capacity and amenities.
-          </p>
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800">Room Type Management</h1>
+            <p className="mt-1 text-slate-500">Manage room categories, pricing, capacity and amenities.</p>
+          </div>
+          <button type="button" className="add-form-trigger" onClick={() => {
+            if (showForm || editingId) resetForm();
+            else { resetForm(); setShowForm(true); }
+          }}>{showForm || editingId ? "Close form" : "+ Add Room Type"}</button>
         </header>
 
         {error && (
@@ -205,7 +210,8 @@ export default function AdminRoomTypes() {
           </div>
         )}
 
-        <section className="rounded-xl border bg-white p-5 shadow-sm">
+        {(showForm || editingId) && (
+        <section className="add-form-panel rounded-xl border bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-xl font-bold text-slate-800">
             {editingId ? "Edit Room Type" : "Add Room Type"}
           </h2>
@@ -310,6 +316,7 @@ export default function AdminRoomTypes() {
             </div>
           </form>
         </section>
+        )}
 
         <section className="overflow-hidden rounded-xl border bg-white shadow-sm">
           <div className="border-b p-5">

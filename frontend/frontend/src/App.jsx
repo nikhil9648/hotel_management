@@ -62,9 +62,11 @@ function App() {
   const location = useLocation();
 
   // Theme
-  const [theme, setTheme] = useState(() =>
-    localStorage.getItem("hotel-theme") === "light" ? "light" : "dark",
-  );
+  const [theme, setTheme] = useState(() => {
+    const initialTheme = localStorage.getItem("hotel-theme") === "light" ? "light" : "dark";
+    document.documentElement.dataset.theme = initialTheme;
+    return initialTheme;
+  });
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -145,10 +147,10 @@ function App() {
   };
 
   // Theme toggle
-  const toggleTheme = (
+  const renderThemeToggle = (className = "theme-toggle") => (
     <button
       type="button"
-      className="theme-toggle"
+      className={className}
       aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
       aria-pressed={theme === "light"}
       onClick={() =>
@@ -247,7 +249,7 @@ function App() {
               <small>{currentUser?.role || "User"}</small>
             </span>
 
-            {toggleTheme}
+            {renderThemeToggle()}
 
             <button
               type="button"
@@ -259,6 +261,8 @@ function App() {
           </div>
         </header>
       )}
+
+      {(!isLoggedIn || isCustomer) && renderThemeToggle("theme-toggle theme-toggle-float")}
 
       <div
         className={

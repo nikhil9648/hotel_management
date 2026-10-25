@@ -69,6 +69,8 @@ export default function AdminMenu() {
 
     const [categoryName, setCategoryName] = useState("");
     const [categoryDescription, setCategoryDescription] = useState("");
+    const [showCategoryForm, setShowCategoryForm] = useState(false);
+    const [showFoodForm, setShowFoodForm] = useState(false);
 
     const [form, setForm] = useState(emptyFoodForm);
     const [editingId, setEditingId] = useState(null);
@@ -136,6 +138,7 @@ export default function AdminMenu() {
     const resetFoodForm = () => {
         setForm({ ...emptyFoodForm });
         setEditingId(null);
+        setShowFoodForm(false);
         setSelectedFile(null);
         setImageMode("upload");
         setFilePreview("");
@@ -177,6 +180,7 @@ export default function AdminMenu() {
 
             setCategoryName("");
             setCategoryDescription("");
+            setShowCategoryForm(false);
             setMessage("Category added successfully.");
         } catch (err) {
             setError(
@@ -424,6 +428,7 @@ export default function AdminMenu() {
     // EDIT FOOD ITEM
     const handleEditFood = (food) => {
         setEditingId(food._id);
+        setShowFoodForm(true);
 
         setForm({
             name: food.name || "",
@@ -696,16 +701,19 @@ export default function AdminMenu() {
 
                 {/* CATEGORY MANAGEMENT */}
                 <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <h2 className="text-xl font-bold text-slate-900">
-                        Category Management
-                    </h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                        Add categories and describe the food items they contain.
-                    </p>
+                    <div className="flex flex-wrap items-end justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-900">Category Management</h2>
+                            <p className="mt-1 text-sm text-slate-500">Add categories and describe the food items they contain.</p>
+                        </div>
+                        <button type="button" className="add-form-trigger" onClick={() => setShowCategoryForm((open) => !open)}>
+                            {showCategoryForm ? "Close form" : "+ Add Category"}
+                        </button>
+                    </div>
 
-                    <form
+                    {showCategoryForm && <form
                         onSubmit={handleAddCategory}
-                        className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-3"
+                        className="add-form-panel mt-5 grid grid-cols-1 gap-3 md:grid-cols-3"
                     >
                         <div>
                             <label
@@ -754,7 +762,7 @@ export default function AdminMenu() {
                                 {categorySaving ? "Adding..." : "+ Add Category"}
                             </button>
                         </div>
-                    </form>
+                    </form>}
 
                     <div className="mt-5">
                         <h3 className="mb-3 text-sm font-bold text-slate-700">
@@ -799,28 +807,18 @@ export default function AdminMenu() {
 
                 {/* ADD / EDIT FOOD */}
                 <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
                         <div>
-                            <h2 className="text-xl font-bold text-slate-900">
-                                {editingId ? "Edit Food Item" : "Add Food Item"}
-                            </h2>
-                            <p className="mt-1 text-sm text-slate-500">
-                                Fill in food details and select an image.
-                            </p>
+                            <h2 className="text-xl font-bold text-slate-900">{editingId ? "Edit Food Item" : "Food Items"}</h2>
+                            <p className="mt-1 text-sm text-slate-500">Add a dish to the menu or edit an existing one.</p>
                         </div>
-
-                        {editingId && (
-                            <button
-                                type="button"
-                                onClick={resetFoodForm}
-                                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
-                            >
-                                Cancel editing
-                            </button>
-                        )}
+                        <button type="button" className="add-form-trigger" onClick={() => {
+                            if (showFoodForm || editingId) resetFoodForm();
+                            else { resetFoodForm(); setShowFoodForm(true); }
+                        }}>{showFoodForm || editingId ? "Close form" : "+ Add Food Item"}</button>
                     </div>
 
-                    <form onSubmit={handleSaveFood} className="space-y-6">
+                    {showFoodForm && <form onSubmit={handleSaveFood} className="add-form-panel space-y-6">
                         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                             <div>
                                 <label
@@ -1099,7 +1097,7 @@ export default function AdminMenu() {
                                 Clear Form
                             </button>
                         </div>
-                    </form>
+                    </form>}
                 </section>
 
                 {/* FOOD ITEMS */}

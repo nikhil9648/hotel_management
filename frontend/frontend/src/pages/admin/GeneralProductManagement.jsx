@@ -18,6 +18,7 @@ const initialForm = {
 
 export default function GeneralProductManagement() {
   const [form, setForm] = useState(initialForm);
+  const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -116,6 +117,7 @@ export default function GeneralProductManagement() {
       );
 
       setForm(initialForm);
+      setShowForm(false);
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -132,14 +134,14 @@ export default function GeneralProductManagement() {
   return (
     <div className="min-h-screen bg-slate-100 p-4 md:p-8">
       <div className="mx-auto max-w-4xl">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-slate-900">
-            Add General POS Product
-          </h1>
-
-          <p className="mt-2 text-slate-600">
-            Register products and barcodes for your separate POS billing system.
-          </p>
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">General POS Products</h1>
+            <p className="mt-2 text-slate-600">Register products and barcodes for your separate POS billing system.</p>
+          </div>
+          <button type="button" className="add-form-trigger" onClick={() => setShowForm((open) => !open)}>
+            {showForm ? "Close form" : "+ Add Product"}
+          </button>
         </div>
 
         {message && (
@@ -154,9 +156,9 @@ export default function GeneralProductManagement() {
           </div>
         )}
 
-        <form
+        {showForm && <form
           onSubmit={handleSubmit}
-          className="rounded-xl bg-white p-5 shadow-sm md:p-8"
+          className="add-form-panel rounded-xl bg-white p-5 shadow-sm md:p-8"
         >
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <label className="text-sm font-medium">
@@ -304,7 +306,7 @@ export default function GeneralProductManagement() {
               Clear Form
             </button>
           </div>
-        </form>
+        </form>}
       </div>
     </div>
   );

@@ -43,6 +43,7 @@ export default function AdminRoomBooking() {
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
     const [booking, setBooking] = useState(null);
+    const [showForm, setShowForm] = useState(false);
 
     const token = getToken();
 
@@ -222,6 +223,7 @@ export default function AdminRoomBooking() {
             );
 
             setBooking(response.data.booking);
+            setShowForm(false);
             setMessage(
                 response.data.message ||
                     "Room booking created successfully."
@@ -245,13 +247,15 @@ export default function AdminRoomBooking() {
 
     return (
         <div className="mx-auto max-w-5xl p-4 md:p-8">
-            <h1 className="mb-2 text-2xl font-bold text-gray-900">
-                Admin Room Booking
-            </h1>
-
-            <p className="mb-6 text-gray-500">
-                Create a room booking for a walk-in or phone customer.
-            </p>
+            <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                    <h1 className="mb-2 text-2xl font-bold text-gray-900">Admin Room Booking</h1>
+                    <p className="text-gray-500">Create a room booking for a walk-in or phone customer.</p>
+                </div>
+                <button type="button" className="add-form-trigger" onClick={() => setShowForm((open) => !open)}>
+                    {showForm ? "Close form" : "+ Create Booking"}
+                </button>
+            </header>
 
             {message && (
                 <div className="mb-4 rounded-lg bg-green-100 p-3 text-green-800">
@@ -313,7 +317,7 @@ export default function AdminRoomBooking() {
                 </div>
             )}
 
-            <form
+            {showForm && <form
                 onSubmit={handleSubmit}
                 className="space-y-6 rounded-xl border bg-white p-5 shadow-sm md:p-7"
             >
@@ -673,7 +677,7 @@ export default function AdminRoomBooking() {
                         ? "Creating Booking..."
                         : "Create Room Booking"}
                 </button>
-            </form>
+            </form>}
         </div>
     );
 }
