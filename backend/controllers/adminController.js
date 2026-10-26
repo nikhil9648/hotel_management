@@ -575,6 +575,61 @@ const deleteStaff = async (req, res) => {
     }
 };
 
+
+const permanentlyDeleteStaff = async (req, res) => {
+    try {
+        const staff = await User.findById(req.params.id);
+
+        if (!staff) {
+            return res.status(404).json({
+                success: false,
+                message: "Staff member not found",
+            });
+        }
+
+        const staffRoles = [
+            "manager",
+            "receptionist",
+            "waiter",
+            "kitchen",
+            "accountant",
+            "hr",
+            "staff",
+            "delivery_boy",
+        ];
+
+        if (!staffRoles.includes(staff.role)) {
+            return res.status(400).json({
+                success: false,
+                message: "This user is not a staff member",
+            });
+        }
+
+        // Admin apna khud ka account delete nahi kar sakta
+        if (String(staff._id) === String(req.user._id)) {
+            return res.status(400).json({
+                success: false,
+                message: "You cannot delete your own account",
+            });
+        }
+
+        await User.deleteOne({ _id: staff._id });
+
+        return res.status(200).json({
+            success: true,
+            message: "Staff permanently deleted successfully",
+        });
+    } catch (error) {
+        console.error("Permanent Delete Staff Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to permanently delete staff",
+        });
+    }
+};
+
+
 module.exports = {
     getAdminProfile,
     getAdminDashboard,
@@ -583,4 +638,5 @@ module.exports = {
     getStaffById,
     updateStaff,
     deleteStaff,
+    permanentlyDeleteStaff,
 };

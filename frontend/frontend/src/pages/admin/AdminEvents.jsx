@@ -629,7 +629,7 @@ const AdminEvents = () => {
                             onClick={() => copyRegistrationLink(item)}
                             className="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
                           >
-                            Copy Registration Link
+                            Copy Link
                           </button>
 
                           <button
@@ -637,7 +637,7 @@ const AdminEvents = () => {
                             onClick={() => openGuestList(item)}
                             className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
                           >
-                            View Guest List
+                            View List
                           </button>
                         </div>
                       </td>

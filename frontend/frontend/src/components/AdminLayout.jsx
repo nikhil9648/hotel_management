@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink, Outlet, Navigate, useNavigate } from "react-router-dom";
-import { Armchair, BedDouble, CalendarDays, ChefHat, ClipboardList, CookingPot, FileClock, LayoutDashboard, LogOut, PackageCheck, PackagePlus, ReceiptText, ScanBarcode, UsersRound, Utensils } from "lucide-react";
+import { BedDouble, CalendarDays, ChefHat, ClipboardList, CookingPot, FileClock, LayoutDashboard, LogOut, PackageCheck, PackagePlus, ReceiptText, ScanBarcode, UsersRound, Utensils } from "lucide-react";
 
 const menuItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
@@ -11,7 +11,7 @@ const menuItems = [
   { label: "Food Menu", path: "/admin/menu", icon: Utensils },
   { label: "Room Management", path: "/admin/rooms", icon: BedDouble },
   { label: "Restaurant Orders", path: "/admin/restaurant-orders", icon: CookingPot },
-  { label: "Room Types", path: "/admin/room-types", icon: Armchair },
+  // { label: "Room Types", path: "/admin/room-types", icon: Armchair },
   { label: "Kitchen Orders", path: "/admin/kitchen", icon: ChefHat },
   { label: "Bill History", path: "/admin/bill-history", icon: FileClock },
   { label: "Restaurant Tables", path: "/admin/restaurant-tables", icon: ClipboardList },

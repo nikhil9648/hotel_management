@@ -1,8 +1,9 @@
 const mongoose = require("mongoose");
-
+const transporter = require("../config/mailer");
 const Booking = require("../models/Booking");
 const Room = require("../models/Room");
 const PDFDocument = require("pdfkit");
+
 
 // =====================================================
 // CONSTANTS
@@ -599,6 +600,139 @@ const createBooking = async (req, res) => {
                 "user",
                 "name email phone"
             );
+
+
+        // 17. Send booking confirmation email with feedback QR code
+        try {
+            const guestEmail = populatedBooking.guestDetails?.email;
+            const guestName = populatedBooking.guestDetails?.name || "Guest";
+
+            // Set FRONTEND_URL in backend .env for your actual website
+            const frontendUrl = (
+                process.env.CLIENT_URL || "http://localhost:5173"
+            ).replace(/\/$/, "");
+
+            const feedbackUrl =
+                `${frontendUrl}/feedback?booking=${encodeURIComponent(
+                    populatedBooking._id.toString()
+                )}`;
+
+            // Generate QR code as a PNG buffer
+            const feedbackQrBuffer = await QRCode.toBuffer(
+                feedbackUrl,
+                {
+                    type: "png",
+                    width: 250,
+                    margin: 2,
+                }
+            );
+
+            if (guestEmail) {
+                await transporter.sendMail({
+                    to: guestEmail,
+                    subject: `Booking Confirmation - ${populatedBooking.bookingNumber}`,
+                    html: `
+                        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333;">
+                            <h2 style="color:#198754;">Booking Confirmation</h2>
+
+                            <p>Dear ${guestName},</p>
+
+                            <p>Thank you for choosing our hotel.
+                            Your room booking has been created successfully.</p>
+
+                            <div style="background:#f5f7fa;padding:18px;border-radius:8px;">
+                                <h3>Booking Details</h3>
+                                <p><strong>Booking Number:</strong>
+                                    ${populatedBooking.bookingNumber}</p>
+                                <p><strong>Room:</strong>
+                                    ${populatedBooking.room?.roomNumber || "Assigned room"}</p>
+                                <p><strong>Check-in:</strong>
+                                    ${new Date(populatedBooking.checkInDate).toLocaleDateString("en-IN")}</p>
+                                <p><strong>Check-out:</strong>
+                                    ${new Date(populatedBooking.checkOutDate).toLocaleDateString("en-IN")}</p>
+                                <p><strong>Number of nights:</strong>
+                                    ${populatedBooking.numberOfNights}</p>
+                                <p><strong>Guests:</strong>
+                                    ${populatedBooking.adults} adults,
+                                    ${populatedBooking.children} children</p>
+                                <p><strong>Total Amount:</strong>
+                                    ₹${Number(populatedBooking.totalAmount).toFixed(2)}</p>
+                                <p><strong>Booking Status:</strong>
+                                    ${populatedBooking.bookingStatus}</p>
+                                <p><strong>Payment Status:</strong>
+                                    ${populatedBooking.paymentStatus}</p>
+                            </div>
+
+                            
+<h3 style="margin-top:25px;">We'd love your feedback!</h3>
+
+<p>
+    Thank you for choosing our hotel. Your feedback helps us
+    improve our service. Please take a moment to share your
+    experience on Google.
+</p>
+
+<div style="text-align:center;margin:20px 0;">
+
+    <img
+        src="cid:feedback-qrcode"
+        alt="Scan to give feedback"
+        width="200"
+        height="200"
+        style="display:block;margin:auto;"
+    />
+
+    <p>
+        <a
+            href="https://g.page/r/CX_ejWvskV-3EBM/review"
+            style="display:inline-block;background:#198754;color:#ffffff;padding:12px 22px;text-decoration:none;border-radius:5px;font-weight:bold;"
+        >
+            ⭐ Share Your Feedback on Google
+        </a>
+    </p>
+
+    <p style="font-size:13px;color:#666;">
+        You can also scan the QR code to open the feedback form.
+    </p>
+
+</div>
+
+                    `,
+                    attachments: [
+                        {
+                            filename: "feedback-qr.png",
+                            content: feedbackQrBuffer,
+                            contentType: "image/png",
+                            cid: "feedback-qrcode",
+                        },
+                    ],
+                });
+
+                console.log(
+                    "Booking confirmation and feedback QR email sent to:",
+                    guestEmail
+                );
+            } else {
+                console.warn(
+                    "Booking created, but guest email is missing:",
+                    populatedBooking._id
+                );
+            }
+        } catch (emailError) {
+            // Email failure must not undo a successful booking
+            console.error(
+                "Booking confirmation email failed:",
+                emailError.message
+            );
+        }
+
+        // Keep your existing success response below this code
+        return res.status(201).json({
+            success: true,
+            message: "Room booking created successfully",
+            booking: populatedBooking,
+        });
+
 
         return res.status(201).json({
             success: true,
@@ -1610,6 +1744,129 @@ const updateBookingStatus = async (
 };
 
 
+const updateBookingPayment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { paymentMethod } = req.body || {};
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid booking ID",
+            });
+        }
+
+        if (!["cash", "upi"].includes(paymentMethod)) {
+            return res.status(400).json({
+                success: false,
+                message: "Payment method must be cash or upi",
+            });
+        }
+
+        const booking = await Booking.findById(id);
+
+        if (!booking) {
+            return res.status(404).json({
+                success: false,
+                message: "Booking not found",
+            });
+        }
+
+        if (booking.bookingStatus === "cancelled") {
+            return res.status(400).json({
+                success: false,
+                message: "Cancelled booking cannot be paid",
+            });
+        }
+
+        if (booking.paymentStatus === "paid") {
+            return res.status(400).json({
+                success: false,
+                message: "Booking is already paid",
+            });
+        }
+
+        // Save payment first.
+        booking.paymentStatus = "paid";
+        booking.paymentMethod = paymentMethod;
+        await booking.save();
+
+        const guest = booking.guestDetails || {};
+        const room = await Room.findById(booking.room);
+
+        let emailSent = false;
+
+        if (guest.email) {
+            try {
+                await transporter.sendMail({
+                    to: guest.email,
+                    subject: `Payment Receipt - ${booking.bookingNumber}`,
+                    text: [
+                        `Dear ${guest.name || "Guest"},`,
+                        "",
+                        "Your room booking payment has been recorded successfully.",
+                        "",
+                        `Booking Number: ${booking.bookingNumber}`,
+                        `Room: ${room?.roomNumber || "—"}`,
+                        `Check-in: ${new Date(booking.checkInDate).toLocaleDateString("en-IN")}`,
+                        `Check-out: ${new Date(booking.checkOutDate).toLocaleDateString("en-IN")}`,
+                        `Total Amount: INR ${Number(booking.totalAmount || 0).toFixed(2)}`,
+                        `Payment Method: ${paymentMethod.toUpperCase()}`,
+                        "Payment Status: PAID",
+                        "",
+                        "Thank you for choosing our hotel.",
+                    ].join("\n"),
+                    html: `
+                        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#222">
+                            <h2 style="color:#15803d">Payment Successful</h2>
+                            <p>Dear ${String(guest.name || "Guest").replace(/[&<>"']/g, "")},</p>
+                            <p>Your room booking payment has been recorded successfully.</p>
+                            <hr/>
+                            <p><b>Booking Number:</b> ${String(booking.bookingNumber || "").replace(/[&<>"']/g, "")}</p>
+                            <p><b>Room:</b> ${String(room?.roomNumber || "—").replace(/[&<>"']/g, "")}</p>
+                            <p><b>Check-in:</b> ${new Date(booking.checkInDate).toLocaleDateString("en-IN")}</p>
+                            <p><b>Check-out:</b> ${new Date(booking.checkOutDate).toLocaleDateString("en-IN")}</p>
+                            <p><b>Total Amount:</b> ₹${Number(booking.totalAmount || 0).toFixed(2)}</p>
+                            <p><b>Payment Method:</b> ${paymentMethod.toUpperCase()}</p>
+                            <p><b>Payment Status:</b> PAID</p>
+                            <hr/>
+                            <p>Thank you for choosing our hotel.</p>
+                        </div>
+                    `,
+                });
+
+                emailSent = true;
+            } catch (mailError) {
+                // Payment is already saved; don't undo it if email fails.
+                console.error("Booking payment email error:", mailError);
+            }
+        }
+
+        const updatedBooking = await Booking.findById(id)
+            .populate("user", "name email phone")
+            .populate("createdBy", "name email")
+            .populate("room", "roomNumber floor price status");
+
+        return res.status(200).json({
+            success: true,
+            message: emailSent
+                ? "Payment updated and confirmation email sent"
+                : "Payment updated, but confirmation email could not be sent",
+            emailSent,
+            booking: updatedBooking,
+        });
+    } catch (error) {
+        console.error("Update Booking Payment Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to update payment",
+        });
+    }
+};
+
+
+
 // =====================================================
 // EXPORTS
 // =====================================================
@@ -1624,4 +1881,5 @@ module.exports = {
     updateBookingStatus,
     adminCreateBooking,
     downloadBookingInvoice,
+    updateBookingPayment,
 };

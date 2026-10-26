@@ -1,683 +1,1204 @@
-
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
 const API = "http://localhost:5000/api";
 
 const getToken = () =>
-    localStorage.getItem("token") ||
-    localStorage.getItem("authToken");
+  localStorage.getItem("token") ||
+  localStorage.getItem("authToken") ||
+  localStorage.getItem("accessToken") ||
+  "";
+
+const getHeaders = () => ({
+  Authorization: `Bearer ${getToken()}`,
+});
 
 const getToday = () => {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
 const initialForm = {
-    room: "",
-    checkInDate: "",
-    checkOutDate: "",
-    adults: 1,
-    children: 0,
-    guestDetails: {
-        name: "",
-        email: "",
-        phone: "",
-        address: "",
-        idProofType: "Aadhar",
-        idProofNumber: "",
-    },
-    paymentMethod: "cash",
-    paymentReceived: false,
-    specialRequests: "",
+  room: "",
+  checkInDate: "",
+  checkOutDate: "",
+  adults: 1,
+  children: 0,
+  name: "",
+  email: "",
+  phone: "",
+  address: "",
+  idProofType: "Aadhar",
+  idProofNumber: "",
+  paymentMethod: "cash",
+  paymentReceived: false,
+  specialRequests: "",
+};
+
+const dateOnly = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+const formatDate = (value) => {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+};
+
+const money = (value) =>
+  `₹${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+const getErrorMessage = (error) =>
+  error?.response?.data?.message || error?.message || "Something went wrong.";
+
+const getRoomNumber = (booking) => {
+  const room = booking?.room;
+  if (!room) return "—";
+  if (typeof room === "string") return room;
+  return room.roomNumber
+    ? `Room ${room.roomNumber}`
+    : "Room details unavailable";
+};
+
+const getGuest = (booking) => {
+  const guest = booking?.guestDetails || {};
+  const user =
+    booking?.user && typeof booking.user === "object" ? booking.user : {};
+
+  return {
+    name: guest.name || user.name || "Guest",
+    email: guest.email || user.email || "—",
+    phone: guest.phone || user.phone || "—",
+    address: guest.address || "",
+    idProofType: guest.idProofType || "",
+    idProofNumber: guest.idProofNumber || "",
+  };
+};
+
+const getStatusClass = (status) => {
+  const value = String(status || "").toLowerCase();
+
+  if (["paid", "confirmed", "checked_in", "checked_out"].includes(value))
+    return "bg-green-100 text-green-800";
+
+  if (["cancelled", "failed", "refunded"].includes(value))
+    return "bg-red-100 text-red-800";
+
+  return "bg-amber-100 text-amber-800";
+};
+
+const isCancelled = (booking) =>
+  String(booking?.bookingStatus || "").toLowerCase() === "cancelled";
+
+const isPreviousBooking = (booking, today) => {
+  const status = String(booking?.bookingStatus || "").toLowerCase();
+  const checkout = dateOnly(booking?.checkOutDate);
+
+  return (
+    isCancelled(booking) ||
+    ["checked_out", "completed"].includes(status) ||
+    Boolean(checkout && checkout < today)
+  );
+};
+
+const getBookingSource = (booking) => {
+  if (booking?.createdBy) {
+    const creator =
+      typeof booking.createdBy === "object"
+        ? booking.createdBy.name || "Staff"
+        : "Staff";
+
+    return { label: "Admin / Staff", person: creator };
+  }
+
+  if (booking?.user) {
+    const user =
+      typeof booking.user === "object"
+        ? booking.user.name || "Customer"
+        : "Customer";
+
+    return { label: "Customer Online", person: user };
+  }
+
+  return { label: "Walk-in / Reception", person: "Reception" };
+};
+
+const escapeHtml = (value) =>
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (char) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[char],
+  );
+
+const printBookingReceipt = (booking) => {
+  const guest = getGuest(booking);
+  const room =
+    booking?.room && typeof booking.room === "object" ? booking.room : {};
+  const source = getBookingSource(booking);
+
+  const receiptWindow = window.open("", "_blank", "width=800,height=750");
+
+  if (!receiptWindow) {
+    alert("Please allow pop-ups to print the receipt.");
+    return;
+  }
+
+  const rows = [
+    ["Booking Number", booking.bookingNumber || booking._id],
+    ["Guest Name", guest.name],
+    ["Email", guest.email],
+    ["Phone", guest.phone],
+    ["Room", room.roomNumber || "—"],
+    ["Floor", room.floor ?? "—"],
+    ["Check-in", formatDate(booking.checkInDate)],
+    ["Check-out", formatDate(booking.checkOutDate)],
+    ["Nights", booking.numberOfNights ?? "—"],
+    ["Adults", booking.adults ?? 1],
+    ["Children", booking.children ?? 0],
+    ["Room Charges", money(booking.roomCharges)],
+    ["Tax", money(booking.taxAmount)],
+    ["Discount", money(booking.discountAmount)],
+    ["Total Amount", money(booking.totalAmount)],
+    ["Payment Method", booking.paymentMethod || "—"],
+    ["Payment Status", booking.paymentStatus || "pending"],
+    ["Booking Status", booking.bookingStatus || "pending"],
+    ["Booked By", `${source.label} - ${source.person}`],
+  ];
+
+  receiptWindow.document.write(`
+        <!doctype html>
+        <html>
+        <head>
+            <meta charset="utf-8" />
+            <title>Booking Receipt</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 28px; color: #222; }
+                h1, h2 { text-align: center; }
+                table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+                td { padding: 10px; border-bottom: 1px solid #ddd; }
+                td:first-child { font-weight: bold; width: 40%; }
+                .footer { text-align: center; margin-top: 35px; color: #555; }
+                @media print { button { display: none; } }
+            </style>
+        </head>
+        <body>
+            <h1>Hotel &amp; Restaurant Management</h1>
+            <h2>Room Booking Receipt</h2>
+            <table>
+                ${rows
+                  .map(
+                    ([label, value]) =>
+                      `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`,
+                  )
+                  .join("")}
+            </table>
+            <p class="footer">Thank you for choosing our hotel.</p>
+            <script>
+                window.onload = function () { window.print(); };
+            </script>
+        </body>
+        </html>
+    `);
+
+  receiptWindow.document.close();
 };
 
 export default function AdminRoomBooking() {
-    const [form, setForm] = useState(initialForm);
-    const [rooms, setRooms] = useState([]);
-    const [loadingRooms, setLoadingRooms] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
-    const [message, setMessage] = useState("");
-    const [error, setError] = useState("");
-    const [booking, setBooking] = useState(null);
-    const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(initialForm);
+  const [rooms, setRooms] = useState([]);
+  const [bookings, setBookings] = useState([]);
 
-    const token = getToken();
+  const [loadingRooms, setLoadingRooms] = useState(false);
+  const [loadingBookings, setLoadingBookings] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [payingId, setPayingId] = useState("");
+  const [paymentMethods, setPaymentMethods] = useState({});
 
-    const headers = {
-        Authorization: `Bearer ${token}`,
-    };
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [search, setSearch] = useState("");
+  const [filterDate, setFilterDate] = useState("");
+  const [activeTab, setActiveTab] = useState("upcoming");
+  const [showForm, setShowForm] = useState(false);
+  const [todayRooms, setTodayRooms] = useState([]);
+  const [todayRoomsLoading, setTodayRoomsLoading] = useState(false);
 
-    // Fetch available rooms for the selected dates.
-    useEffect(() => {
-        const { checkInDate, checkOutDate } = form;
+  const today = getToday();
 
-        setRooms([]);
+  // LOAD ALL BOOKINGS
+  const loadBookings = useCallback(async () => {
+    setLoadingBookings(true);
+    setError("");
 
-        if (!checkInDate || !checkOutDate) {
-            setLoadingRooms(false);
-            return;
+    try {
+      const response = await axios.get(`${API}/bookings`, {
+        headers: getHeaders(),
+      });
+
+      const data = response.data;
+      const list = Array.isArray(data)
+        ? data
+        : data?.bookings || data?.data?.bookings || [];
+
+      setBookings(list);
+    } catch (err) {
+      setBookings([]);
+      setError(
+        `${getErrorMessage(err)} Check that GET /api/bookings is connected to getAllBookings.`,
+      );
+    } finally {
+      setLoadingBookings(false);
+    }
+  }, []);
+
+  // LOAD AVAILABLE ROOMS
+  const loadRooms = useCallback(async () => {
+    if (
+      !form.checkInDate ||
+      !form.checkOutDate ||
+      form.checkOutDate <= form.checkInDate
+    ) {
+      setRooms([]);
+      return;
+    }
+
+    setLoadingRooms(true);
+
+    try {
+      const response = await axios.get(`${API}/bookings/available-rooms`, {
+        headers: getHeaders(),
+        params: {
+          checkInDate: form.checkInDate,
+          checkOutDate: form.checkOutDate,
+        },
+      });
+
+      setRooms(response.data?.rooms || response.data?.data?.rooms || []);
+    } catch (err) {
+      setRooms([]);
+      setError(getErrorMessage(err));
+    } finally {
+      setLoadingRooms(false);
+    }
+  }, [form.checkInDate, form.checkOutDate]);
+
+  useEffect(() => {
+    loadBookings();
+  }, [loadBookings]);
+
+  useEffect(() => {
+    loadRooms();
+  }, [loadRooms]);
+
+  const handleChange = (event) => {
+    const { name, value, type, checked } = event.target;
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: type === "checkbox" ? checked : value,
+      ...(name === "checkInDate" || name === "checkOutDate"
+        ? { room: "" }
+        : {}),
+    }));
+
+    setError("");
+    setSuccess("");
+  };
+
+  // CREATE ADMIN BOOKING
+  const handleCreateBooking = async (event) => {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!form.room) {
+      setError("Please select an available room.");
+      return;
+    }
+
+    if (!form.checkInDate || !form.checkOutDate) {
+      setError("Please select check-in and check-out dates.");
+      return;
+    }
+
+    if (form.checkOutDate <= form.checkInDate) {
+      setError("Check-out date must be after check-in date.");
+      return;
+    }
+
+    if (form.checkInDate < today) {
+      setError("Check-in date cannot be in the past.");
+      return;
+    }
+
+    if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
+      setError("Guest name, email and phone are required.");
+      return;
+    }
+
+    setCreating(true);
+
+    try {
+      const payload = {
+        room: form.room,
+        checkInDate: form.checkInDate,
+        checkOutDate: form.checkOutDate,
+        adults: Number(form.adults),
+        children: Number(form.children),
+        guestDetails: {
+          name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
+          phone: form.phone.trim(),
+          address: form.address.trim(),
+          idProofType: form.idProofType,
+          idProofNumber: form.idProofNumber.trim(),
+        },
+        paymentMethod: form.paymentMethod,
+        paymentReceived: form.paymentReceived,
+        specialRequests: form.specialRequests.trim(),
+      };
+
+      const response = await axios.post(
+        `${API}/bookings/admin-create`,
+        payload,
+        { headers: getHeaders() },
+      );
+
+      setSuccess(
+        response.data?.message ||
+          "Room booking created. Check the guest email if your backend sends booking confirmations.",
+      );
+
+      setForm(initialForm);
+      setRooms([]);
+      setShowForm(false);
+      await loadBookings();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // MARK PENDING PAYMENT AS PAID AND REQUEST EMAIL FROM BACKEND
+  const handleMarkPaid = async (booking) => {
+    const paymentMethod = paymentMethods[booking._id] || "cash";
+
+    if (isCancelled(booking)) {
+      setError("Cancelled bookings cannot be marked as paid.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Confirm that ${money(booking.totalAmount)} has actually been received by ${paymentMethod.toUpperCase()}?`,
+      )
+    ) {
+      return;
+    }
+
+    setPayingId(booking._id);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await axios.patch(
+        `${API}/bookings/${booking._id}/payment`,
+        { paymentMethod },
+        { headers: getHeaders() },
+      );
+
+      await loadBookings();
+
+      setSuccess(
+        response.data?.message ||
+          "Payment updated. Check email status in the server response.",
+      );
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setPayingId("");
+    }
+  };
+
+  const loadTodayAvailableRooms = async () => {
+    try {
+      setTodayRoomsLoading(true);
+
+      const today = getToday();
+
+      const response = await axios.get(`${API}/bookings/available-rooms`, {
+        params: {
+          checkInDate: today,
+          checkOutDate: today,
+        },
+        headers: getHeaders(),
+      });
+
+      const data = response.data;
+
+      setTodayRooms(
+        Array.isArray(data)
+          ? data
+          : data.rooms || data.availableRooms || data.data || [],
+      );
+    } catch (error) {
+      console.error(
+        "Today's available rooms error:",
+        error.response?.data || error.message,
+      );
+      setTodayRooms([]);
+    } finally {
+      setTodayRoomsLoading(false);
+    }
+  };
+
+  // FILTER AND SORT
+  const filteredBookings = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
+    return bookings
+      .filter((booking) => {
+        const previous = isPreviousBooking(booking, today);
+
+        if (activeTab === "previous" && !previous) return false;
+        if (activeTab === "upcoming" && previous) return false;
+
+        if (filterDate && dateOnly(booking.checkInDate) !== filterDate) {
+          return false;
         }
 
-        if (checkOutDate <= checkInDate) {
-            setError("Check-out date must be after check-in date.");
-            setLoadingRooms(false);
-            return;
+        if (normalizedSearch) {
+          const guest = getGuest(booking);
+          const source = getBookingSource(booking);
+
+          const searchable = [
+            booking.bookingNumber,
+            guest.name,
+            guest.email,
+            guest.phone,
+            getRoomNumber(booking),
+            booking.bookingStatus,
+            booking.paymentStatus,
+            source.label,
+            source.person,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+
+          if (!searchable.includes(normalizedSearch)) return false;
         }
 
-        let cancelled = false;
+        return true;
+      })
+      .sort((a, b) => {
+        const dateA = dateOnly(a.checkInDate);
+        const dateB = dateOnly(b.checkInDate);
 
-        const loadRooms = async () => {
-            setLoadingRooms(true);
-            setError("");
+        return activeTab === "upcoming"
+          ? dateA.localeCompare(dateB)
+          : dateB.localeCompare(dateA);
+      });
+  }, [bookings, search, filterDate, activeTab, today]);
 
-            try {
-                const response = await axios.get(
-                    `${API}/bookings/available-rooms`,
-                    {
-                        params: {
-                            checkInDate,
-                            checkOutDate,
-                        },
-                        headers,
-                    }
-                );
+  const upcomingCount = bookings.filter(
+    (booking) => !isPreviousBooking(booking, today),
+  ).length;
 
-                if (!cancelled) {
-                    setRooms(response.data.rooms || []);
-                }
-            } catch (err) {
-                if (!cancelled) {
-                    setRooms([]);
-                    setError(
-                        err.response?.data?.message ||
-                            "Unable to load available rooms."
-                    );
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoadingRooms(false);
-                }
-            }
-        };
+  const previousCount = bookings.filter((booking) =>
+    isPreviousBooking(booking, today),
+  ).length;
 
-        loadRooms();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [form.checkInDate, form.checkOutDate, token]);
-
-    // Update top-level form fields.
-    const updateField = (name, value) => {
-        setForm((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-    };
-
-    // Update guest details.
-    const updateGuest = (name, value) => {
-        setForm((prev) => ({
-            ...prev,
-            guestDetails: {
-                ...prev.guestDetails,
-                [name]: value,
-            },
-        }));
-    };
-
-    // Selected room.
-    const selectedRoom = rooms.find(
-        (room) => room._id === form.room
-    );
-
-    // Calculate nights using date-only values.
-    const nights =
-        form.checkInDate &&
-        form.checkOutDate &&
-        form.checkOutDate > form.checkInDate
-            ? Math.round(
-                  (
-                      new Date(`${form.checkOutDate}T00:00:00`) -
-                      new Date(`${form.checkInDate}T00:00:00`)
-                  ) /
-                      (1000 * 60 * 60 * 24)
-              )
-            : 0;
-
-    const price = selectedRoom
-        ? Number(
-              selectedRoom.price ??
-                  selectedRoom.roomType?.basePrice ??
-                  0
-          )
-        : 0;
-
-    const roomCharges = price * nights;
-    const tax = Math.round(roomCharges * 0.18 * 100) / 100;
-    const total = roomCharges + tax;
-
-    // Create admin booking.
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-
-        setError("");
-        setMessage("");
-        setBooking(null);
-
-        if (!token) {
-            setError("Login session not found. Please log in again.");
-            return;
-        }
-
-        if (!form.room) {
-            setError("Please select an available room.");
-            return;
-        }
-
-        if (form.checkOutDate <= form.checkInDate) {
-            setError("Check-out date must be after check-in date.");
-            return;
-        }
-
-        if (!form.guestDetails.idProofNumber.trim()) {
-            setError("Please enter the guest's ID proof number.");
-            return;
-        }
-
-        if (
-            form.paymentReceived !== true &&
-            form.paymentReceived !== false
-        ) {
-            setError("Please confirm the payment status.");
-            return;
-        }
-
-        setSubmitting(true);
-
-        try {
-            const payload = {
-                ...form,
-                adults: Number(form.adults),
-                children: Number(form.children),
-                guestDetails: {
-                    ...form.guestDetails,
-                    name: form.guestDetails.name.trim(),
-                    email: form.guestDetails.email.trim().toLowerCase(),
-                    phone: form.guestDetails.phone.trim(),
-                    address: form.guestDetails.address.trim(),
-                    idProofType: form.guestDetails.idProofType,
-                    idProofNumber:
-                        form.guestDetails.idProofNumber.trim(),
-                },
-            };
-
-            const response = await axios.post(
-                `${API}/bookings/admin-create`,
-                payload,
-                { headers }
-            );
-
-            setBooking(response.data.booking);
-            setShowForm(false);
-            setMessage(
-                response.data.message ||
-                    "Room booking created successfully."
-            );
-
-            setForm({
-                ...initialForm,
-                guestDetails: { ...initialForm.guestDetails },
-            });
-
-            setRooms([]);
-        } catch (err) {
-            setError(
-                err.response?.data?.message ||
-                    "Unable to create booking."
-            );
-        } finally {
-            setSubmitting(false);
-        }
-    };
+  const renderPaymentActions = (booking) => {
+    const pending =
+      String(booking.paymentStatus || "pending").toLowerCase() === "pending";
 
     return (
-        <div className="mx-auto max-w-5xl p-4 md:p-8">
-            <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-                <div>
-                    <h1 className="mb-2 text-2xl font-bold text-gray-900">Admin Room Booking</h1>
-                    <p className="text-gray-500">Create a room booking for a walk-in or phone customer.</p>
-                </div>
-                <button type="button" className="add-form-trigger" onClick={() => setShowForm((open) => !open)}>
-                    {showForm ? "Close form" : "+ Create Booking"}
-                </button>
-            </header>
+      <div className="min-w-36 space-y-2">
+        <span
+          className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClass(
+            booking.paymentStatus,
+          )}`}
+        >
+          {booking.paymentStatus || "pending"}
+        </span>
 
-            {message && (
-                <div className="mb-4 rounded-lg bg-green-100 p-3 text-green-800">
-                    {message}
-                </div>
-            )}
+        <p className="text-xs text-gray-500">{booking.paymentMethod || "—"}</p>
 
-            {error && (
-                <div className="mb-4 rounded-lg bg-red-100 p-3 text-red-700">
-                    {error}
-                </div>
-            )}
-
-            {booking && (
-                <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-5">
-                    <h2 className="mb-3 text-lg font-semibold text-green-900">
-                        Booking Created Successfully
-                    </h2>
-
-                    <p>
-                        <strong>Booking Number:</strong>{" "}
-                        {booking.bookingNumber}
-                    </p>
-
-                    <p>
-                        <strong>Guest:</strong>{" "}
-                        {booking.guestDetails?.name}
-                    </p>
-
-                    <p>
-                        <strong>Room:</strong>{" "}
-                        {booking.room?.roomNumber || "—"}
-                    </p>
-
-                    <p>
-                        <strong>ID Proof:</strong>{" "}
-                        {booking.guestDetails?.idProofType || "—"}
-                    </p>
-
-                    <p>
-                        <strong>Payment Method:</strong>{" "}
-                        {booking.paymentMethod?.toUpperCase()}
-                    </p>
-
-                    <p>
-                        <strong>Payment Status:</strong>{" "}
-                        {booking.paymentStatus}
-                    </p>
-
-                    <p>
-                        <strong>Booking Status:</strong>{" "}
-                        {booking.bookingStatus}
-                    </p>
-
-                    <p className="mt-2 text-lg font-bold">
-                        Total: ₹
-                        {Number(booking.totalAmount || 0).toFixed(2)}
-                    </p>
-                </div>
-            )}
-
-            {showForm && <form
-                onSubmit={handleSubmit}
-                className="space-y-6 rounded-xl border bg-white p-5 shadow-sm md:p-7"
+        {pending && !isCancelled(booking) && (
+          <div className="space-y-2">
+            <select
+              value={paymentMethods[booking._id] || "cash"}
+              onChange={(event) =>
+                setPaymentMethods((previous) => ({
+                  ...previous,
+                  [booking._id]: event.target.value,
+                }))
+              }
+              className="w-full rounded-lg border p-2 text-xs"
+              aria-label="Payment method"
             >
-                {/* Guest Details */}
-                <section>
-                    <h2 className="mb-4 border-b pb-2 text-lg font-semibold text-gray-800">
-                        Guest Details
-                    </h2>
+              <option value="cash">Cash received</option>
+              <option value="upi">UPI received</option>
+            </select>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <label className="text-sm font-medium text-gray-700">
-                            Full Name *
-                            <input
-                                className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                                type="text"
-                                placeholder="Enter guest full name"
-                                value={form.guestDetails.name}
-                                onChange={(e) =>
-                                    updateGuest("name", e.target.value)
-                                }
-                                autoComplete="name"
-                                required
-                            />
-                        </label>
+            <button
+              type="button"
+              disabled={payingId === booking._id}
+              onClick={() => handleMarkPaid(booking)}
+              className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {payingId === booking._id ? "Updating..." : "Mark Paid"}
+            </button>
+          </div>
+        )}
 
-                        <label className="text-sm font-medium text-gray-700">
-                            Email Address *
-                            <input
-                                className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                                type="email"
-                                placeholder="Enter email address"
-                                value={form.guestDetails.email}
-                                onChange={(e) =>
-                                    updateGuest("email", e.target.value)
-                                }
-                                autoComplete="email"
-                                required
-                            />
-                        </label>
+        <button
+          type="button"
+          onClick={() => printBookingReceipt(booking)}
+          className="w-full rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-gray-100"
+        >
+          Print Receipt
+        </button>
+      </div>
+    );
+  };
 
-                        <label className="text-sm font-medium text-gray-700">
-                            Phone Number *
-                            <input
-                                className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                                type="tel"
-                                placeholder="Enter phone number"
-                                value={form.guestDetails.phone}
-                                onChange={(e) =>
-                                    updateGuest("phone", e.target.value)
-                                }
-                                autoComplete="tel"
-                                required
-                            />
-                        </label>
+  const renderBookingDetails = (booking) => {
+    const guest = getGuest(booking);
+    const source = getBookingSource(booking);
 
-                        <label className="text-sm font-medium text-gray-700">
-                            Address
-                            <input
-                                className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                                type="text"
-                                placeholder="Enter address (optional)"
-                                value={form.guestDetails.address}
-                                onChange={(e) =>
-                                    updateGuest("address", e.target.value)
-                                }
-                                autoComplete="street-address"
-                            />
-                        </label>
+    return (
+      <>
+        <p className="font-bold">{booking.bookingNumber || booking._id}</p>
+        <p className="mt-1 font-medium">{guest.name}</p>
+        <p className="break-all text-xs text-gray-500">{guest.email}</p>
+        <p className="text-xs text-gray-500">{guest.phone}</p>
 
-                        <label className="text-sm font-medium text-gray-700">
-                            ID Proof Type *
-                            <select
-                                className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                                value={form.guestDetails.idProofType}
-                                onChange={(e) =>
-                                    updateGuest("idProofType", e.target.value)
-                                }
-                                required
-                            >
-                                <option value="Aadhar">Aadhar Card</option>
-                                <option value="Passport">Passport</option>
-                                <option value="Driving License">
-                                    Driving License
-                                </option>
-                                <option value="Voter ID">Voter ID</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </label>
+        {guest.address && (
+          <p className="mt-1 text-xs text-gray-500">Address: {guest.address}</p>
+        )}
 
-                        <label className="text-sm font-medium text-gray-700">
-                            ID Proof Number *
-                            <input
-                                className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                                type="text"
-                                placeholder="Enter ID proof number"
-                                value={form.guestDetails.idProofNumber}
-                                onChange={(e) =>
-                                    updateGuest(
-                                        "idProofNumber",
-                                        e.target.value
-                                    )
-                                }
-                                autoComplete="off"
-                                required
-                            />
-                        </label>
-                    </div>
-                </section>
+        {guest.idProofType && (
+          <p className="mt-1 text-xs text-gray-500">
+            ID: {guest.idProofType}
+            {guest.idProofNumber ? ` • ${guest.idProofNumber}` : ""}
+          </p>
+        )}
 
-                {/* Stay Details */}
-                <section>
-                    <h2 className="mb-4 border-b pb-2 text-lg font-semibold text-gray-800">
-                        Stay Details
-                    </h2>
+        <div className="mt-2 rounded bg-gray-50 p-2 text-xs">
+          <p className="font-semibold">Booked By: {source.label}</p>
+          <p className="text-gray-600">{source.person}</p>
+        </div>
+      </>
+    );
+  };
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <label className="text-sm font-medium text-gray-700">
-                            Check-in Date *
-                            <input
-                                className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                                type="date"
-                                min={getToday()}
-                                value={form.checkInDate}
-                                onChange={(e) => {
-                                    const value = e.target.value;
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 text-gray-800 sm:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <h1 className="text-2xl font-bold sm:text-3xl">Room Booking</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Manage bookings, guest details, payments and receipts.
+            </p>
+          </div>
 
-                                    setForm((prev) => ({
-                                        ...prev,
-                                        checkInDate: value,
-                                        checkOutDate:
-                                            prev.checkOutDate &&
-                                            prev.checkOutDate > value
-                                                ? prev.checkOutDate
-                                                : "",
-                                        room: "",
-                                    }));
-                                }}
-                                required
-                            />
-                        </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={loadBookings}
+              disabled={loadingBookings}
+              className="rounded-lg border bg-white px-4 py-2 text-sm font-semibold hover:bg-gray-100 disabled:opacity-50"
+            >
+              {loadingBookings ? "Refreshing..." : "↻ Refresh"}
+            </button>
 
-                        <label className="text-sm font-medium text-gray-700">
-                            Check-out Date *
-                            <input
-                                className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                                type="date"
-                                min={form.checkInDate || getToday()}
-                                value={form.checkOutDate}
-                                onChange={(e) => {
-                                    setForm((prev) => ({
-                                        ...prev,
-                                        checkOutDate: e.target.value,
-                                        room: "",
-                                    }));
-                                }}
-                                required
-                            />
-                        </label>
+            <button
+              type="button"
+              onClick={() => {
+                setShowForm((value) => !value);
+                setError("");
+                setSuccess("");
+              }}
+              className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-800"
+            >
+              {showForm ? "Close Form" : "+ Create Booking"}
+            </button>
+          </div>
+        </header>
 
-                        <label className="text-sm font-medium text-gray-700 md:col-span-2">
-                            Available Room *
-                            <select
-                                className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                                value={form.room}
-                                onChange={(e) =>
-                                    updateField("room", e.target.value)
-                                }
-                                disabled={
-                                    loadingRooms ||
-                                    !form.checkInDate ||
-                                    !form.checkOutDate
-                                }
-                                required
-                            >
-                                <option value="">
-                                    {!form.checkInDate ||
-                                    !form.checkOutDate
-                                        ? "Select dates first"
-                                        : loadingRooms
-                                          ? "Loading available rooms..."
-                                          : "Select an available room"}
-                                </option>
+        <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Today's Available Rooms
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Rooms available for today's check-in
+              </p>
+            </div>
 
-                                {rooms.map((room) => {
-                                    const roomPrice = Number(
-                                        room.price ??
-                                            room.roomType?.basePrice ??
-                                            0
-                                    );
+            <button
+              type="button"
+              onClick={loadTodayAvailableRooms}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              Refresh
+            </button>
+          </div>
 
-                                    return (
-                                        <option
-                                            key={room._id}
-                                            value={room._id}
-                                        >
-                                            Room {room.roomNumber} —{" "}
-                                            {room.roomType?.name || "Room"} — ₹
-                                            {roomPrice}/night
-                                        </option>
-                                    );
-                                })}
-                            </select>
+          {todayRoomsLoading ? (
+            <p className="py-5 text-center text-gray-500">
+              Loading available rooms...
+            </p>
+          ) : todayRooms.length === 0 ? (
+            <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
+              No available rooms found for today.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {todayRooms.map((room) => (
+                <div
+                  key={room._id}
+                  className="rounded-xl border border-green-200 bg-green-50 p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-bold text-gray-900">
+                      Room {room.roomNumber || room.number || "N/A"}
+                    </h3>
 
-                            {!loadingRooms &&
-                                form.checkInDate &&
-                                form.checkOutDate &&
-                                form.checkOutDate > form.checkInDate &&
-                                rooms.length === 0 && (
-                                    <span className="mt-2 block text-sm text-amber-700">
-                                        No available rooms for these dates.
-                                    </span>
-                                )}
-                        </label>
+                    <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
+                      Available
+                    </span>
+                  </div>
 
-                        <label className="text-sm font-medium text-gray-700">
-                            Adults *
-                            <input
-                                className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                                type="number"
-                                min="1"
-                                step="1"
-                                value={form.adults}
-                                onChange={(e) =>
-                                    updateField("adults", e.target.value)
-                                }
-                                required
-                            />
-                        </label>
+                  <p className="mt-2 text-sm text-gray-600">
+                    Type: {room.roomType?.name || room.type || "Standard"}
+                  </p>
 
-                        <label className="text-sm font-medium text-gray-700">
-                            Children
-                            <input
-                                className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={form.children}
-                                onChange={(e) =>
-                                    updateField("children", e.target.value)
-                                }
-                                required
-                            />
-                        </label>
-                    </div>
-                </section>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Price: ₹{room.price ?? room.roomType?.basePrice ?? 0} /
+                    night
+                  </p>
 
-                {/* Payment Details */}
-                <section>
-                    <h2 className="mb-4 border-b pb-2 text-lg font-semibold text-gray-800">
-                        Payment Details
-                    </h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Capacity: {room.roomType?.capacity ?? "N/A"} guests
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
-                    <label className="block text-sm font-medium text-gray-700">
-                        Payment Method *
-                        <select
-                            className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                            value={form.paymentMethod}
-                            onChange={(e) =>
-                                updateField("paymentMethod", e.target.value)
-                            }
-                            required
-                        >
-                            <option value="cash">Cash</option>
-                            <option value="upi">UPI</option>
-                        </select>
-                    </label>
+        {error && (
+          <div
+            role="alert"
+            className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+          >
+            <p className="font-semibold">Unable to complete request</p>
+            <p className="mt-1 break-words">{error}</p>
+          </div>
+        )}
 
-                    <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border p-4">
-                        <input
-                            type="checkbox"
-                            className="mt-1 h-4 w-4"
-                            checked={form.paymentReceived}
-                            onChange={(e) =>
-                                updateField(
-                                    "paymentReceived",
-                                    e.target.checked
-                                )
-                            }
-                        />
+        {success && (
+          <div
+            role="status"
+            className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800"
+          >
+            {success}
+          </div>
+        )}
 
-                        <span>
-                            <span className="block font-medium text-gray-800">
-                                Payment received
-                            </span>
-                            <span className="mt-1 block text-sm text-gray-500">
-                                Mark this only after confirming cash receipt
-                                or successful UPI payment.
-                            </span>
-                        </span>
-                    </label>
-                </section>
+        {showForm && (
+          <section className="rounded-2xl border bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="mb-5 text-xl font-bold">Create Guest Booking</h2>
 
-                {/* Booking Summary */}
-                <section>
-                    <h2 className="mb-4 border-b pb-2 text-lg font-semibold text-gray-800">
-                        Booking Summary
-                    </h2>
+            <form onSubmit={handleCreateBooking} className="space-y-6">
+              <div>
+                <h3 className="mb-3 font-semibold">Stay Details</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <label className="text-sm">
+                    <span className="mb-1 block font-medium">
+                      Check-in Date *
+                    </span>
+                    <input
+                      type="date"
+                      name="checkInDate"
+                      min={today}
+                      value={form.checkInDate}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border p-2.5"
+                    />
+                  </label>
 
-                    <div className="space-y-3 rounded-lg bg-gray-50 p-4 text-sm">
-                        <div className="flex justify-between gap-4">
-                            <span>Price per night</span>
-                            <span>₹{price.toFixed(2)}</span>
-                        </div>
+                  <label className="text-sm">
+                    <span className="mb-1 block font-medium">
+                      Check-out Date *
+                    </span>
+                    <input
+                      type="date"
+                      name="checkOutDate"
+                      min={form.checkInDate || today}
+                      value={form.checkOutDate}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border p-2.5"
+                    />
+                  </label>
 
-                        <div className="flex justify-between gap-4">
-                            <span>Number of nights</span>
-                            <span>{nights}</span>
-                        </div>
+                  <label className="text-sm">
+                    <span className="mb-1 block font-medium">Adults *</span>
+                    <input
+                      type="number"
+                      name="adults"
+                      min="1"
+                      value={form.adults}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border p-2.5"
+                    />
+                  </label>
 
-                        <div className="flex justify-between gap-4">
-                            <span>Room charges</span>
-                            <span>₹{roomCharges.toFixed(2)}</span>
-                        </div>
+                  <label className="text-sm">
+                    <span className="mb-1 block font-medium">Children</span>
+                    <input
+                      type="number"
+                      name="children"
+                      min="0"
+                      value={form.children}
+                      onChange={handleChange}
+                      className="w-full rounded-lg border p-2.5"
+                    />
+                  </label>
+                </div>
+              </div>
 
-                        <div className="flex justify-between gap-4">
-                            <span>Tax (18%)</span>
-                            <span>₹{tax.toFixed(2)}</span>
-                        </div>
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="font-semibold">Available Room *</h3>
+                  {loadingRooms && (
+                    <span className="text-xs text-gray-500">
+                      Checking availability...
+                    </span>
+                  )}
+                </div>
 
-                        <div className="flex justify-between gap-4 border-t pt-3 text-lg font-bold">
-                            <span>Total Amount</span>
-                            <span>₹{total.toFixed(2)}</span>
-                        </div>
-                    </div>
+                <select
+                  name="room"
+                  value={form.room}
+                  onChange={handleChange}
+                  required
+                  disabled={
+                    loadingRooms ||
+                    !form.checkInDate ||
+                    !form.checkOutDate ||
+                    form.checkOutDate <= form.checkInDate
+                  }
+                  className="w-full rounded-lg border bg-white p-3 disabled:bg-gray-100"
+                >
+                  <option value="">
+                    {!form.checkInDate || !form.checkOutDate
+                      ? "Select dates first"
+                      : "Select an available room"}
+                  </option>
 
-                    <p className="mt-2 text-xs text-gray-500">
-                        This is a preview. The backend calculates the final
-                        booking amount.
+                  {rooms.map((room) => (
+                    <option key={room._id} value={room._id}>
+                      Room {room.roomNumber}
+                      {room.floor !== undefined ? ` | Floor ${room.floor}` : ""}
+                      {room.price || room.roomType?.basePrice
+                        ? ` | ${money(room.price || room.roomType?.basePrice)} / night`
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+
+                {!loadingRooms &&
+                  form.checkInDate &&
+                  form.checkOutDate &&
+                  form.checkOutDate > form.checkInDate &&
+                  rooms.length === 0 && (
+                    <p className="mt-2 text-sm text-amber-700">
+                      No available rooms found for these dates.
                     </p>
-                </section>
+                  )}
+              </div>
 
-                {/* Special Requests */}
-                <section>
-                    <label className="block text-sm font-medium text-gray-700">
-                        Special Requests
-                        <textarea
-                            className="mt-1 block w-full rounded-lg border p-3 font-normal"
-                            rows={3}
-                            placeholder="Any additional guest requests..."
-                            value={form.specialRequests}
-                            onChange={(e) =>
-                                updateField(
-                                    "specialRequests",
-                                    e.target.value
-                                )
-                            }
-                        />
-                    </label>
-                </section>
+              <div>
+                <h3 className="mb-3 font-semibold">Guest Details</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <label className="text-sm">
+                    <span className="mb-1 block font-medium">Guest Name *</span>
+                    <input
+                      name="name"
+                      value={form.name}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border p-2.5"
+                      placeholder="Full name"
+                    />
+                  </label>
+
+                  <label className="text-sm">
+                    <span className="mb-1 block font-medium">Email *</span>
+                    <input
+                      type="email"
+                      name="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border p-2.5"
+                      placeholder="guest@example.com"
+                    />
+                  </label>
+
+                  <label className="text-sm">
+                    <span className="mb-1 block font-medium">Phone *</span>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={form.phone}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border p-2.5"
+                      placeholder="Phone number"
+                    />
+                  </label>
+
+                  <label className="text-sm sm:col-span-2 lg:col-span-3">
+                    <span className="mb-1 block font-medium">Address *</span>
+                    <textarea
+                      name="address"
+                      value={form.address}
+                      onChange={handleChange}
+                      rows="2"
+                      className="w-full rounded-lg border p-2.5"
+                      placeholder="Guest address"
+                      required
+                    />
+                  </label>
+
+                  <label className="text-sm">
+                    <span className="mb-1 block font-medium">
+                      ID Proof Type *
+                    </span>
+                    <select
+                      name="idProofType"
+                      value={form.idProofType}
+                      onChange={handleChange}
+                      className="w-full rounded-lg border bg-white p-2.5"
+                    >
+                      <option value="Aadhar">Aadhar</option>
+                      <option value="Passport">Passport</option>
+                      <option value="Driving License">Driving License</option>
+                      <option value="Voter ID">Voter ID</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </label>
+
+                  <label className="text-sm sm:col-span-2">
+                    <span className="mb-1 block font-medium">
+                      ID Proof Number *
+                    </span>
+                    <input
+                      name="idProofNumber"
+                      value={form.idProofNumber}
+                      onChange={handleChange}
+                      className="w-full rounded-lg border p-2.5"
+                      placeholder="ID number"
+                      required
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-3 font-semibold">Payment Details</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label className="text-sm">
+                    <span className="mb-1 block font-medium">
+                      Payment Method *
+                    </span>
+                    <select
+                      name="paymentMethod"
+                      value={form.paymentMethod}
+                      onChange={handleChange}
+                      required
+                      className="w-full rounded-lg border bg-white p-2.5"
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="upi">UPI</option>
+                    </select>
+                  </label>
+
+                  <label className="flex items-center gap-3 rounded-lg border p-3 text-sm">
+                    <input
+                      type="checkbox"
+                      name="paymentReceived"
+                      checked={form.paymentReceived}
+                      onChange={handleChange}
+                      className="h-4 w-4"
+                    />
+                    <span>
+                      <span className="block font-semibold">
+                        Payment received
+                      </span>
+                      <span className="text-gray-500">
+                        Check only if payment was actually received.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium">Special Requests</span>
+                <textarea
+                  name="specialRequests"
+                  value={form.specialRequests}
+                  onChange={handleChange}
+                  rows="3"
+                  className="w-full rounded-lg border p-2.5"
+                  placeholder="Any special requirements..."
+                />
+              </label>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="submit"
+                  disabled={creating || loadingRooms}
+                  className="rounded-lg bg-amber-700 px-6 py-3 font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {creating ? "Creating Booking..." : "Create Booking"}
+                </button>
 
                 <button
-                    type="submit"
-                    disabled={submitting || loadingRooms}
-                    className="w-full rounded-lg bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    setForm(initialForm);
+                    setRooms([]);
+                  }}
+                  className="rounded-lg border px-6 py-3 font-semibold hover:bg-gray-100"
                 >
-                    {submitting
-                        ? "Creating Booking..."
-                        : "Create Room Booking"}
+                  Cancel
                 </button>
-            </form>}
-        </div>
-    );
+              </div>
+            </form>
+          </section>
+        )}
+
+        <section className="rounded-2xl border bg-white p-4 shadow-sm sm:p-6">
+          <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="text-xl font-bold">Room Booking Records</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Upcoming and previous stays, guest details, payment and
+                receipts.
+              </p>
+            </div>
+            <div className="rounded-full bg-gray-100 px-4 py-2 text-sm font-semibold">
+              {bookings.length} Total Bookings
+            </div>
+          </div>
+
+          <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <label className="text-sm">
+              <span className="mb-1 block font-medium">
+                Search guest, phone, email or booking number
+              </span>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search bookings..."
+                className="w-full rounded-lg border p-3"
+              />
+            </label>
+
+            <label className="text-sm">
+              <span className="mb-1 block font-medium">
+                Filter by check-in date
+              </span>
+              <input
+                type="date"
+                value={filterDate}
+                onChange={(event) => setFilterDate(event.target.value)}
+                className="w-full rounded-lg border p-3"
+              />
+            </label>
+          </div>
+
+          <div className="mb-5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("upcoming")}
+              className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                activeTab === "upcoming"
+                  ? "border-amber-700 bg-amber-700 text-white"
+                  : "bg-white hover:bg-gray-100"
+              }`}
+            >
+              Upcoming ({upcomingCount})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("previous")}
+              className={`rounded-full border px-4 py-2 text-sm font-semibold ${
+                activeTab === "previous"
+                  ? "border-amber-700 bg-amber-700 text-white"
+                  : "bg-white hover:bg-gray-100"
+              }`}
+            >
+              Previous ({previousCount})
+            </button>
+          </div>
+
+          {loadingBookings ? (
+            <div className="rounded-xl bg-gray-50 p-10 text-center text-gray-500">
+              Loading bookings...
+            </div>
+          ) : filteredBookings.length === 0 ? (
+            <div className="rounded-xl bg-gray-50 p-10 text-center">
+              <p className="font-semibold">No {activeTab} bookings found.</p>
+              <p className="mt-1 text-sm text-gray-500">
+                Try changing the search text or date filter.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* DESKTOP TABLE */}
+              <div className="hidden overflow-x-auto rounded-xl border lg:block">
+                <table className="w-full min-w-[1350px] text-left text-sm">
+                  <thead className="bg-gray-100 text-gray-700">
+                    <tr>
+                      <th className="p-3">Booking / Guest</th>
+                      <th className="p-3">Room</th>
+                      <th className="p-3">Check-in</th>
+                      <th className="p-3">Check-out</th>
+                      <th className="p-3">Guests</th>
+                      <th className="p-3">Amount</th>
+                      <th className="p-3">Booking Status</th>
+                      <th className="p-3">Payment / Actions</th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y">
+                    {filteredBookings.map((booking) => (
+                      <tr
+                        key={booking._id}
+                        className="align-top hover:bg-gray-50"
+                      >
+                        <td className="p-3">{renderBookingDetails(booking)}</td>
+                        <td className="p-3">
+                          {getRoomNumber(booking)}
+                          {booking.room?.floor !== undefined && (
+                            <p className="text-xs text-gray-500">
+                              Floor {booking.room.floor}
+                            </p>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap p-3">
+                          {formatDate(booking.checkInDate)}
+                        </td>
+                        <td className="whitespace-nowrap p-3">
+                          {formatDate(booking.checkOutDate)}
+                        </td>
+                        <td className="p-3">
+                          {booking.adults ?? 1} Adult(s)
+                          <p className="text-xs text-gray-500">
+                            {booking.children ?? 0} Child(ren)
+                          </p>
+                        </td>
+                        <td className="whitespace-nowrap p-3 font-semibold">
+                          {money(booking.totalAmount)}
+                          <p className="text-xs font-normal text-gray-500">
+                            {booking.numberOfNights ?? "—"} night(s)
+                          </p>
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClass(booking.bookingStatus)}`}
+                          >
+                            {booking.bookingStatus || "pending"}
+                          </span>
+                        </td>
+                        <td className="p-3">{renderPaymentActions(booking)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* MOBILE / TABLET CARDS */}
+              <div className="grid grid-cols-1 gap-4 lg:hidden">
+                {filteredBookings.map((booking) => (
+                  <article key={booking._id} className="rounded-xl border p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs text-gray-500">Booking Number</p>
+                        <h3 className="font-bold">
+                          {booking.bookingNumber || booking._id}
+                        </h3>
+                      </div>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClass(booking.bookingStatus)}`}
+                      >
+                        {booking.bookingStatus || "pending"}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 space-y-3 text-sm">
+                      {renderBookingDetails(booking)}
+                      <hr />
+                      <p>
+                        <b>Room:</b> {getRoomNumber(booking)}
+                      </p>
+                      <p>
+                        <b>Check-in:</b> {formatDate(booking.checkInDate)}
+                      </p>
+                      <p>
+                        <b>Check-out:</b> {formatDate(booking.checkOutDate)}
+                      </p>
+                      <p>
+                        <b>Guests:</b> {booking.adults ?? 1} Adult(s),{" "}
+                        {booking.children ?? 0} Child(ren)
+                      </p>
+                      <p>
+                        <b>Total:</b> {money(booking.totalAmount)}
+                      </p>
+                      {renderPaymentActions(booking)}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+    </div>
+  );
 }

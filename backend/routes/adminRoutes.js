@@ -8,6 +8,7 @@ const {
     getStaffById,
     updateStaff,
     deleteStaff,
+    permanentlyDeleteStaff,
 } = require("../controllers/adminController");
 
 const {
@@ -135,6 +136,12 @@ deactivateGeneralProduct
 router.post("/general-bills", protect, authorize("admin"), createGeneralBill);
 router.get("/general-bills", protect, authorize("admin"), getGeneralBills);
 router.get("/general-bills/:id", protect, authorize("admin"), getGeneralBillById);
+router.delete(
+    "/staff/:id/permanent",
+    protect,
+    authorize("admin"),
+    permanentlyDeleteStaff
+);
 router.get(
 "/general-billing-report",
 protect,

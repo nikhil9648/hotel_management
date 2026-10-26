@@ -1,3 +1,4 @@
+
 const express = require("express");
 
 const {
@@ -10,6 +11,7 @@ const {
     updateBookingStatus,
     adminCreateBooking,
     downloadBookingInvoice,
+    updateBookingPayment,
 } = require("../controllers/bookingController");
 
 const {
@@ -18,7 +20,6 @@ const {
 } = require("../middleware/authMiddleware");
 
 const router = express.Router();
-
 
 // =====================================================
 // CUSTOMER ROUTES
@@ -32,7 +33,6 @@ router.get(
     getAvailableRooms
 );
 
-
 // Create new booking
 // POST /api/bookings
 router.post(
@@ -40,6 +40,9 @@ router.post(
     protect,
     createBooking
 );
+
+// Create booking from admin/reception
+// POST /api/bookings/admin-create
 router.post(
     "/admin-create",
     protect,
@@ -55,25 +58,6 @@ router.get(
     getMyBookings
 );
 
-
-// Get single booking
-// GET /api/bookings/:id
-router.get(
-    "/:id",
-    protect,
-    getBookingById
-);
-
-
-// Cancel booking
-// PATCH /api/bookings/:id/cancel
-router.patch(
-    "/:id/cancel",
-    protect,
-    cancelBooking
-);
-
-
 // =====================================================
 // ADMIN ROUTES
 // =====================================================
@@ -87,13 +71,24 @@ router.get(
     getAllBookings
 );
 
+// Update payment status
+// PATCH /api/bookings/:id/payment
+router.patch(
+    "/:id/payment",
+    protect,
+    authorize("admin"),
+    updateBookingPayment
+);
+
 // Download booking invoice PDF
+// GET /api/bookings/:id/invoice
 router.get(
     "/:id/invoice",
     protect,
     authorize("admin"),
     downloadBookingInvoice
 );
+
 // Update booking status
 // PATCH /api/bookings/:id/status
 router.patch(
@@ -103,5 +98,24 @@ router.patch(
     updateBookingStatus
 );
 
+// =====================================================
+// CUSTOMER BOOKING DETAILS / CANCELLATION
+// =====================================================
+
+// Get single booking
+// GET /api/bookings/:id
+router.get(
+    "/:id",
+    protect,
+    getBookingById
+);
+
+// Cancel booking
+// PATCH /api/bookings/:id/cancel
+router.patch(
+    "/:id/cancel",
+    protect,
+    cancelBooking
+);
 
 module.exports = router;
