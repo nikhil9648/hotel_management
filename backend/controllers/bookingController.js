@@ -3,7 +3,39 @@ const transporter = require("../config/mailer");
 const Booking = require("../models/Booking");
 const Room = require("../models/Room");
 const PDFDocument = require("pdfkit");
+const crypto = require("crypto");
 
+
+const decryptCheckInOtp = (encryptedValue) => {
+    const key = Buffer.from(
+        process.env.CHECKIN_OTP_ENCRYPTION_KEY,
+        "hex"
+    );
+
+    if (key.length !== 32) {
+        throw new Error(
+            "CHECKIN_OTP_ENCRYPTION_KEY must be a 32-byte hex key"
+        );
+    }
+
+    const [ivHex, authTagHex, encryptedHex] =
+        encryptedValue.split(":");
+
+    const decipher = crypto.createDecipheriv(
+        "aes-256-gcm",
+        key,
+        Buffer.from(ivHex, "hex")
+    );
+
+    decipher.setAuthTag(
+        Buffer.from(authTagHex, "hex")
+    );
+
+    return Buffer.concat([
+        decipher.update(Buffer.from(encryptedHex, "hex")),
+        decipher.final(),
+    ]).toString("utf8");
+};
 
 // =====================================================
 // CONSTANTS
@@ -733,13 +765,6 @@ const createBooking = async (req, res) => {
             booking: populatedBooking,
         });
 
-
-        return res.status(201).json({
-            success: true,
-            message: "Room booking created successfully",
-            booking: populatedBooking,
-        });
-
     } catch (error) {
         console.error(
             "Create Booking Error:",
@@ -1032,23 +1057,52 @@ const getMyBookings = async (
             filter.bookingStatus = status;
         }
 
-        const bookings =
-            await Booking.find(filter)
-                .populate(
-                    "room",
-                    "roomNumber floor price status"
-                )
-                .sort({
-                    createdAt: -1,
-                });
+        const bookings = await Booking.find(filter)
+  .select("+checkInOtpEncrypted")
+  .populate("room", "roomNumber floor price status")
+  .sort({ createdAt: -1 });
 
+  const now = new Date();
+
+const bookingsWithOtp = bookings.map((booking) => {
+    const data = booking.toObject();
+
+    const canShowOtp =
+        data.paymentStatus === "paid" &&
+        !["checked_out", "cancelled"].includes(
+            data.bookingStatus
+        ) &&
+        data.checkInOtpEncrypted &&
+        data.checkInOtpExpiresAt &&
+        now < new Date(data.checkInOtpExpiresAt);
+
+    if (canShowOtp) {
+        try {
+            data.checkInOtp = decryptCheckInOtp(
+                data.checkInOtpEncrypted
+            );
+        } catch (error) {
+            console.error(
+                "Check-in OTP decryption failed:",
+                error.message
+            );
+
+            data.checkInOtp = null;
+        }
+    } else {
+        data.checkInOtp = null;
+    }
+
+    delete data.checkInOtpEncrypted;
+    delete data.checkInOtpHash;
+
+    return data;
+});
         return res.status(200).json({
-            success: true,
-
-            count: bookings.length,
-
-            bookings,
-        });
+    success: true,
+    count: bookingsWithOtp.length,
+    bookings: bookingsWithOtp,
+});
 
     } catch (error) {
         console.error(
@@ -1142,6 +1196,277 @@ const getBookingById = async (
     }
 };
 
+
+// =====================================================
+// VERIFY CHECK-IN OTP + CHECK IN GUEST
+// PATCH /api/bookings/:id/check-in
+// =====================================================
+
+const checkInBooking = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { otp } = req.body;
+
+        // ---------------------------------------------
+        // Validate booking ID
+        // ---------------------------------------------
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid booking ID",
+            });
+        }
+
+        // ---------------------------------------------
+        // Validate OTP
+        // ---------------------------------------------
+        if (!otp || !/^\d{4}$/.test(String(otp))) {
+            return res.status(400).json({
+                success: false,
+                message: "Please enter a valid 4-digit OTP",
+            });
+        }
+
+        // checkInOtpHash may have select:false in schema
+        const booking = await Booking.findById(id)
+            .select("+checkInOtpHash +checkInOtpEncrypted")
+            .populate("room", "roomNumber floor price status");
+
+        if (!booking) {
+            return res.status(404).json({
+                success: false,
+                message: "Booking not found",
+            });
+        }
+
+        // ---------------------------------------------
+        // Check booking status
+        // ---------------------------------------------
+        if (booking.bookingStatus === "checked_in") {
+            return res.status(400).json({
+                success: false,
+                message: "Guest is already checked in",
+            });
+        }
+
+        if (booking.bookingStatus === "checked_out") {
+            return res.status(400).json({
+                success: false,
+                message: "This booking is already checked out",
+            });
+        }
+
+        if (booking.bookingStatus === "cancelled") {
+            return res.status(400).json({
+                success: false,
+                message: "Cancelled booking cannot be checked in",
+            });
+        }
+
+        if (booking.bookingStatus !== "confirmed") {
+            return res.status(400).json({
+                success: false,
+                message: "Only confirmed bookings can be checked in",
+            });
+        }
+
+        // ---------------------------------------------
+        // Payment must be completed
+        // ---------------------------------------------
+        if (booking.paymentStatus !== "paid") {
+            return res.status(400).json({
+                success: false,
+                message: "Payment must be completed before check-in",
+            });
+        }
+
+        // ---------------------------------------------
+        // OTP must exist
+        // ---------------------------------------------
+        if (!booking.checkInOtpHash) {
+            return res.status(400).json({
+                success: false,
+                message: "Check-in OTP is not available for this booking",
+            });
+        }
+
+        // ---------------------------------------------
+        // Check OTP expiry
+        // ---------------------------------------------
+        if (
+            !booking.checkInOtpExpiresAt ||
+            new Date() > new Date(booking.checkInOtpExpiresAt)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Check-in OTP has expired",
+            });
+        }
+
+        // ---------------------------------------------
+        // Hash entered OTP
+        // ---------------------------------------------
+        const enteredOtpHash = crypto
+            .createHash("sha256")
+            .update(String(otp))
+            .digest("hex");
+
+        // ---------------------------------------------
+        // Verify OTP securely
+        // ---------------------------------------------
+        const storedHash = Buffer.from(
+            booking.checkInOtpHash,
+            "hex"
+        );
+
+        const enteredHash = Buffer.from(
+            enteredOtpHash,
+            "hex"
+        );
+
+        const otpValid =
+            storedHash.length === enteredHash.length &&
+            crypto.timingSafeEqual(storedHash, enteredHash);
+
+        if (!otpValid) {
+            return res.status(400).json({
+                success: false,
+                message: "Incorrect check-in OTP",
+            });
+        }
+
+        // ---------------------------------------------
+        // OTP correct -> Check in guest
+        // ---------------------------------------------
+        booking.bookingStatus = "checked_in";
+        booking.checkInOtpVerifiedAt = new Date();
+
+        await booking.save();
+
+        // ---------------------------------------------
+        // Send check-in confirmation email
+        // ---------------------------------------------
+        let emailSent = false;
+
+        try {
+            const guestEmail = booking.guestDetails?.email;
+            const guestName =
+                booking.guestDetails?.name || "Guest";
+
+            if (guestEmail) {
+                await transporter.sendMail({
+                    from: process.env.MAIL_FROM,
+                    to: guestEmail,
+                    subject: `Check-in Successful - ${booking.bookingNumber}`,
+                    html: `
+                        <div style="
+                            font-family: Arial, sans-serif;
+                            max-width: 600px;
+                            margin: auto;
+                            color: #333;
+                        ">
+
+                            <h2 style="color:#198754;">
+                                Check-in Successful!
+                            </h2>
+
+                            <p>Dear ${guestName},</p>
+
+                            <p>
+                                Your check-in has been completed successfully.
+                            </p>
+
+                            <p>
+                                <strong>Booking Number:</strong>
+                                ${booking.bookingNumber}
+                            </p>
+
+                            <p>
+                                <strong>Room:</strong>
+                                ${booking.room?.roomNumber || "Assigned Room"}
+                            </p>
+
+                            <p>
+                                <strong>Check-in:</strong>
+                                ${new Date(
+                                    booking.checkInDate
+                                ).toLocaleDateString("en-IN", {
+                                    timeZone: "UTC",
+                                })}
+                            </p>
+
+                            <p>
+                                <strong>Check-out:</strong>
+                                ${new Date(
+                                    booking.checkOutDate
+                                ).toLocaleDateString("en-IN", {
+                                    timeZone: "UTC",
+                                })}
+                            </p>
+
+                            <p>
+                                <strong>Status:</strong>
+                                Checked In
+                            </p>
+
+                            <p>
+                                We hope you have a comfortable stay.
+                            </p>
+
+                            <p>
+                                Thank you for choosing
+                                Maurya Kitchen & Stays.
+                            </p>
+
+                        </div>
+                    `,
+                });
+
+                emailSent = true;
+
+                console.log(
+                    "Check-in confirmation email sent:",
+                    guestEmail
+                );
+            }
+        } catch (emailError) {
+            // IMPORTANT:
+            // Email failure should NOT undo successful check-in.
+            console.error(
+                "Check-in email failed:",
+                emailError.message
+            );
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: emailSent
+                ? "Guest checked in successfully. Confirmation email sent."
+                : "Guest checked in successfully.",
+
+            booking: {
+                id: booking._id,
+                bookingNumber: booking.bookingNumber,
+                bookingStatus: booking.bookingStatus,
+                checkInOtpVerifiedAt:
+                    booking.checkInOtpVerifiedAt,
+            },
+
+            emailSent,
+        });
+
+    } catch (error) {
+        console.error(
+            "Check In Booking Error:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to check in guest",
+        });
+    }
+};
 
 // =====================================================
 // CANCEL BOOKING
@@ -1908,4 +2233,5 @@ module.exports = {
     adminCreateBooking,
     downloadBookingInvoice,
     updateBookingPayment,
+    checkInBooking,
 };

@@ -252,6 +252,8 @@ export default function AdminRoomBooking() {
   const [creating, setCreating] = useState(false);
   const [payingId, setPayingId] = useState("");
   const [paymentMethods, setPaymentMethods] = useState({});
+  const [otpValues, setOtpValues] = useState({});
+const [checkingInId, setCheckingInId] = useState("");
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -520,6 +522,54 @@ const handleChange = (event) => {
       setPayingId("");
     }
   };
+
+const handleVerifyCheckIn = async (booking) => {
+  const otp = String(otpValues[booking._id] || "").trim();
+
+  if (!/^\d{4}$/.test(otp)) {
+    setError("Please enter a valid 4-digit OTP.");
+    return;
+  }
+
+  setError("");
+  setSuccess("");
+  setCheckingInId(booking._id);
+
+  try {
+    const response = await axios.patch(
+      `${API}/bookings/${booking._id}/check-in`,
+      { otp },
+      { headers: getHeaders() }
+    );
+
+    setOtpValues((prev) => ({
+      ...prev,
+      [booking._id]: "",
+    }));
+
+    setSuccess(
+      response.data?.message || "Guest checked in successfully."
+    );
+
+    await loadBookings();
+  } catch (err) {
+    setError(getErrorMessage(err));
+  } finally {
+    setCheckingInId("");
+  }
+};
+
+const canVerifyOnlineCheckIn = (booking) => {
+  const onlineBooking = Boolean(booking.user) && !booking.createdBy;
+
+  return (
+    onlineBooking &&
+    !isPreviousBooking(booking, today) &&
+    String(booking.paymentStatus).toLowerCase() === "paid" &&
+    String(booking.bookingStatus).toLowerCase() === "confirmed"
+  );
+};
+
 
   const filteredBookings = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -1211,7 +1261,51 @@ const handleChange = (event) => {
                             {booking.bookingStatus || "pending"}
                           </span>
                         </td>
-                        <td className="p-3">{renderPaymentActions(booking)}</td>
+                        
+<td className="p-3">
+  {renderPaymentActions(booking)}
+
+  {canVerifyOnlineCheckIn(booking) && (
+    <div className="mt-3 min-w-44 space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+      <p className="text-sm font-bold text-blue-900">
+        Guest Check-in OTP
+      </p>
+
+      <input
+        type="text"
+        inputMode="numeric"
+        maxLength={4}
+        autoComplete="off"
+        value={otpValues[booking._id] || ""}
+        onChange={(e) => {
+          const value = e.target.value.replace(/\D/g, "").slice(0, 4);
+
+          setOtpValues((prev) => ({
+            ...prev,
+            [booking._id]: value,
+          }));
+        }}
+        placeholder="Enter 4-digit OTP"
+        className="w-full rounded-lg border bg-white p-2 text-sm"
+      />
+
+      <button
+        type="button"
+        disabled={
+          checkingInId === booking._id ||
+          (otpValues[booking._id] || "").length !== 4
+        }
+        onClick={() => handleVerifyCheckIn(booking)}
+        className="w-full rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+      >
+        {checkingInId === booking._id
+          ? "Verifying..."
+          : "Verify & Check In"}
+      </button>
+    </div>
+  )}
+</td>
+
                       </tr>
                     ))}
                   </tbody>

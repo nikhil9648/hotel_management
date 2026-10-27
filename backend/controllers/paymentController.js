@@ -3,6 +3,41 @@ const mongoose = require("mongoose");
 
 const Booking = require("../models/Booking");
 const razorpay = require("../config/razorpay");
+const transporter = require("../config/mailer");
+
+const encryptCheckInOtp = (otp) => {
+    const key = Buffer.from(
+        process.env.CHECKIN_OTP_ENCRYPTION_KEY,
+        "hex"
+    );
+
+    if (key.length !== 32) {
+        throw new Error(
+            "CHECKIN_OTP_ENCRYPTION_KEY must be a 32-byte hex key"
+        );
+    }
+
+    const iv = crypto.randomBytes(12);
+
+    const cipher = crypto.createCipheriv(
+        "aes-256-gcm",
+        key,
+        iv
+    );
+
+    const encrypted = Buffer.concat([
+        cipher.update(otp, "utf8"),
+        cipher.final(),
+    ]);
+
+    const authTag = cipher.getAuthTag();
+
+    return [
+        iv.toString("hex"),
+        authTag.toString("hex"),
+        encrypted.toString("hex"),
+    ].join(":");
+};
 
 // =====================================================
 // CREATE RAZORPAY ORDER
@@ -320,6 +355,103 @@ const verifyPayment = async (req, res) => {
             razorpay_signature;
 
         await booking.save();
+
+        let emailSent = Boolean(booking.confirmationEmailSentAt);
+
+if (!emailSent) {
+    try {
+        const guestEmail = booking.guestDetails?.email;
+        const guestName = booking.guestDetails?.name || "Guest";
+
+        if (!guestEmail) {
+            throw new Error("Guest email is missing");
+        }
+
+        // Generate a new OTP for this email attempt.
+        // Generate 4-digit check-in OTP
+const otp = crypto.randomInt(1000, 10000).toString();
+
+booking.checkInOtpHash = crypto
+    .createHash("sha256")
+    .update(otp)
+    .digest("hex");
+
+booking.checkInOtpEncrypted = encryptCheckInOtp(otp);
+
+booking.checkInOtpExpiresAt = new Date(
+    booking.checkOutDate
+);
+
+booking.checkInOtpVerifiedAt = null;
+
+await booking.save();
+
+        await transporter.sendMail({
+            from: process.env.MAIL_FROM,
+            to: guestEmail,
+            subject: `Booking Confirmed - ${booking.bookingNumber}`,
+            html: `
+                <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
+                    <h2 style="color:#198754">Booking Confirmed!</h2>
+                    <p>Dear ${guestName},</p>
+                    <p>Your payment has been received successfully.</p>
+
+                    <p><strong>Booking Number:</strong>
+                        ${booking.bookingNumber}</p>
+
+                    <p><strong>Check-in:</strong>
+                        ${new Date(booking.checkInDate).toLocaleDateString("en-IN", { timeZone: "UTC" })}</p>
+
+                    <p><strong>Check-out:</strong>
+                        ${new Date(booking.checkOutDate).toLocaleDateString("en-IN", { timeZone: "UTC" })}</p>
+
+                    <p><strong>Amount Paid:</strong>
+                        ₹${Number(booking.totalAmount).toFixed(2)}</p>
+
+                    <h3>Your Check-in OTP</h3>
+                    <p>Show this OTP to hotel staff when you arrive:</p>
+
+                    <div style="font-size:30px;font-weight:bold;letter-spacing:8px;padding:18px;background:#f5f7fa;text-align:center">
+                        ${otp}
+                    </div>
+
+                    <p>This OTP Can't Share Anyone. Keep it private and share it only with hotel staff during check-in.</p>
+                    <p>Thank you for choosing Maurya Kitchen &amp; Stays.</p>
+                </div>
+            `,
+        });
+
+        booking.confirmationEmailSentAt = new Date();
+        await booking.save();
+
+        emailSent = true;
+
+        console.log("Booking confirmation email sent:", guestEmail);
+    } catch (emailError) {
+        console.error(
+            "Booking email failed; payment remains successful:",
+            emailError.message
+        );
+    }
+}
+
+return res.status(200).json({
+    success: true,
+    message: "Payment verified successfully",
+    payment: {
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        status: "paid",
+    },
+    booking: {
+        id: booking._id,
+        bookingNumber: booking.bookingNumber,
+        bookingStatus: booking.bookingStatus,
+        paymentStatus: booking.paymentStatus,
+        totalAmount: booking.totalAmount,
+    },
+    emailSent,
+});
 
         return res.status(200).json({
             success: true,

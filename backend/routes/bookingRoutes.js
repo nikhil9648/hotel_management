@@ -12,6 +12,7 @@ const {
     adminCreateBooking,
     downloadBookingInvoice,
     updateBookingPayment,
+    checkInBooking,
 } = require("../controllers/bookingController");
 
 const {
@@ -98,6 +99,14 @@ router.patch(
     updateBookingStatus
 );
 
+// Verify guest OTP and check in
+// PATCH /api/bookings/:id/check-in
+router.patch(
+    "/:id/check-in",
+    protect,
+    authorize("admin"),
+    checkInBooking
+);
 // =====================================================
 // CUSTOMER BOOKING DETAILS / CANCELLATION
 // =====================================================

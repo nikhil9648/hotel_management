@@ -215,6 +215,33 @@ razorpaySignature: {
     type: String,
     default: null,
 },
+// Check-in OTP
+checkInOtpHash: {
+    type: String,
+    default: null,
+    select: false,
+},
+
+checkInOtpExpiresAt: {
+    type: Date,
+    default: null,
+},
+
+checkInOtpVerifiedAt: {
+    type: Date,
+    default: null,
+},
+
+// Prevent duplicate confirmation emails
+confirmationEmailSentAt: {
+    type: Date,
+    default: null,
+},
+checkInOtpEncrypted: {
+    type: String,
+    default: null,
+    select: false,
+},
         // =========================================
         // Special Request
         // =========================================
