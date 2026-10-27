@@ -824,9 +824,35 @@ const adminCreateBooking = async (req, res) => {
             });
         }
 
-        const checkIn = normalizeDate(checkInDate);
-        const checkOut = normalizeDate(checkOutDate);
-        const today = normalizeDate(new Date());
+        const parseDateOnly = (value) => {
+    if (typeof value !== "string") return null;
+
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+
+    const [, year, month, day] = match;
+    const date = new Date(
+        Date.UTC(Number(year), Number(month) - 1, Number(day))
+    );
+
+    if (
+        date.getUTCFullYear() !== Number(year) ||
+        date.getUTCMonth() !== Number(month) - 1 ||
+        date.getUTCDate() !== Number(day)
+    ) {
+        return null;
+    }
+
+    return date;
+};
+
+const checkIn = parseDateOnly(checkInDate);
+const checkOut = parseDateOnly(checkOutDate);
+
+const now = new Date();
+const today = new Date(
+    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+);
 
         if (!checkIn || !checkOut || checkOut <= checkIn) {
             return res.status(400).json({

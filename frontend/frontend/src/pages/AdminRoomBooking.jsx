@@ -13,9 +13,15 @@ const getHeaders = () => ({
   Authorization: `Bearer ${getToken()}`,
 });
 
-const getToday = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const formatLocalDate = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+const getToday = () => formatLocalDate(new Date());
+
+const getTomorrow = () => {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  return formatLocalDate(date);
 };
 
 const initialForm = {
@@ -37,21 +43,23 @@ const initialForm = {
 
 const dateOnly = (value) => {
   if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const match = String(value).match(/^\d{4}-\d{2}-\d{2}/);
+  if (match) return match[0];
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : formatLocalDate(date);
 };
 
 const formatDate = (value) => {
-  if (!value) return "—";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime())
-    ? "—"
-    : d.toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
+  const date = dateOnly(value);
+  if (!date) return "—";
+
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 const money = (value) =>
@@ -63,10 +71,18 @@ const money = (value) =>
 const getErrorMessage = (error) =>
   error?.response?.data?.message || error?.message || "Something went wrong.";
 
+const getRoomType = (room) => {
+  if (room?.roomType && typeof room.roomType === "object") {
+    return room.roomType;
+  }
+  return {};
+};
+
 const getRoomNumber = (booking) => {
   const room = booking?.room;
   if (!room) return "—";
   if (typeof room === "string") return room;
+
   return room.roomNumber
     ? `Room ${room.roomNumber}`
     : "Room details unavailable";
@@ -90,11 +106,17 @@ const getGuest = (booking) => {
 const getStatusClass = (status) => {
   const value = String(status || "").toLowerCase();
 
-  if (["paid", "confirmed", "checked_in", "checked_out"].includes(value))
+  if (
+    ["paid", "confirmed", "checked_in", "checked_out", "completed"].includes(
+      value,
+    )
+  ) {
     return "bg-green-100 text-green-800";
+  }
 
-  if (["cancelled", "failed", "refunded"].includes(value))
+  if (["cancelled", "failed", "refunded"].includes(value)) {
     return "bg-red-100 text-red-800";
+  }
 
   return "bg-amber-100 text-amber-800";
 };
@@ -109,7 +131,7 @@ const isPreviousBooking = (booking, today) => {
   return (
     isCancelled(booking) ||
     ["checked_out", "completed"].includes(status) ||
-    Boolean(checkout && checkout < today)
+    Boolean(checkout && checkout <= today)
   );
 };
 
@@ -157,7 +179,7 @@ const printBookingReceipt = (booking) => {
   const receiptWindow = window.open("", "_blank", "width=800,height=750");
 
   if (!receiptWindow) {
-    alert("Please allow pop-ups to print the receipt.");
+    window.alert("Please allow pop-ups to print the receipt.");
     return;
   }
 
@@ -184,39 +206,36 @@ const printBookingReceipt = (booking) => {
   ];
 
   receiptWindow.document.write(`
-        <!doctype html>
-        <html>
-        <head>
-            <meta charset="utf-8" />
-            <title>Booking Receipt</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 28px; color: #222; }
-                h1, h2 { text-align: center; }
-                table { width: 100%; border-collapse: collapse; margin-top: 24px; }
-                td { padding: 10px; border-bottom: 1px solid #ddd; }
-                td:first-child { font-weight: bold; width: 40%; }
-                .footer { text-align: center; margin-top: 35px; color: #555; }
-                @media print { button { display: none; } }
-            </style>
-        </head>
-        <body>
-            <h1>Hotel &amp; Restaurant Management</h1>
-            <h2>Room Booking Receipt</h2>
-            <table>
-                ${rows
-                  .map(
-                    ([label, value]) =>
-                      `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`,
-                  )
-                  .join("")}
-            </table>
-            <p class="footer">Thank you for choosing our hotel.</p>
-            <script>
-                window.onload = function () { window.print(); };
-            </script>
-        </body>
-        </html>
-    `);
+    <!doctype html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <title>Booking Receipt</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 28px; color: #222; }
+        h1, h2 { text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+        td { padding: 10px; border-bottom: 1px solid #ddd; }
+        td:first-child { font-weight: bold; width: 40%; }
+        .footer { text-align: center; margin-top: 35px; color: #555; }
+      </style>
+    </head>
+    <body>
+      <h1>Hotel &amp; Restaurant Management</h1>
+      <h2>Room Booking Receipt</h2>
+      <table>
+        ${rows
+          .map(
+            ([label, value]) =>
+              `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`,
+          )
+          .join("")}
+      </table>
+      <p class="footer">Thank you for choosing our hotel.</p>
+      <script>window.onload = function () { window.print(); };</script>
+    </body>
+    </html>
+  `);
 
   receiptWindow.document.close();
 };
@@ -225,9 +244,11 @@ export default function AdminRoomBooking() {
   const [form, setForm] = useState(initialForm);
   const [rooms, setRooms] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [todayRooms, setTodayRooms] = useState([]);
 
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingBookings, setLoadingBookings] = useState(false);
+  const [todayRoomsLoading, setTodayRoomsLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [payingId, setPayingId] = useState("");
   const [paymentMethods, setPaymentMethods] = useState({});
@@ -238,15 +259,11 @@ export default function AdminRoomBooking() {
   const [filterDate, setFilterDate] = useState("");
   const [activeTab, setActiveTab] = useState("upcoming");
   const [showForm, setShowForm] = useState(false);
-  const [todayRooms, setTodayRooms] = useState([]);
-  const [todayRoomsLoading, setTodayRoomsLoading] = useState(false);
 
   const today = getToday();
 
-  // LOAD ALL BOOKINGS
   const loadBookings = useCallback(async () => {
     setLoadingBookings(true);
-    setError("");
 
     try {
       const response = await axios.get(`${API}/bookings`, {
@@ -260,16 +277,15 @@ export default function AdminRoomBooking() {
 
       setBookings(list);
     } catch (err) {
-      setBookings([]);
       setError(
-        `${getErrorMessage(err)} Check that GET /api/bookings is connected to getAllBookings.`,
+        `${getErrorMessage(err)} Check GET /api/bookings and its permissions.`,
       );
     } finally {
       setLoadingBookings(false);
     }
   }, []);
 
-  // LOAD AVAILABLE ROOMS
+  // Availability is always requested using the currently selected date range.
   const loadRooms = useCallback(async () => {
     if (
       !form.checkInDate ||
@@ -291,7 +307,12 @@ export default function AdminRoomBooking() {
         },
       });
 
-      setRooms(response.data?.rooms || response.data?.data?.rooms || []);
+      const data = response.data;
+      setRooms(
+        Array.isArray(data)
+          ? data
+          : data?.rooms || data?.data?.rooms || data?.availableRooms || [],
+      );
     } catch (err) {
       setRooms([]);
       setError(getErrorMessage(err));
@@ -300,47 +321,78 @@ export default function AdminRoomBooking() {
     }
   }, [form.checkInDate, form.checkOutDate]);
 
+  const loadTodayAvailableRooms = useCallback(async () => {
+    setTodayRoomsLoading(true);
+
+    try {
+      const response = await axios.get(`${API}/bookings/available-rooms`, {
+        headers: getHeaders(),
+        params: {
+          checkInDate: getToday(),
+          checkOutDate: getTomorrow(),
+        },
+      });
+
+      const data = response.data;
+      setTodayRooms(
+        Array.isArray(data)
+          ? data
+          : data?.rooms || data?.availableRooms || data?.data?.rooms || [],
+      );
+    } catch (err) {
+      setTodayRooms([]);
+      setError(getErrorMessage(err));
+    } finally {
+      setTodayRoomsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadBookings();
-  }, [loadBookings]);
+    loadTodayAvailableRooms();
+  }, [loadBookings, loadTodayAvailableRooms]);
 
   useEffect(() => {
     loadRooms();
   }, [loadRooms]);
 
-  const handleChange = (event) => {
-    const { name, value, type, checked } = event.target;
+const handleChange = (event) => {
+  const { name, value, type, checked } = event.target;
 
-    setForm((previous) => ({
-      ...previous,
+  console.log("Input changed:", name, value);
+
+  setForm((prev) => {
+    const next = {
+      ...prev,
       [name]: type === "checkbox" ? checked : value,
-      ...(name === "checkInDate" || name === "checkOutDate"
-        ? { room: "" }
-        : {}),
-    }));
+    };
 
-    setError("");
-    setSuccess("");
-  };
+    if (name === "checkInDate") {
+      next.room = "";
 
-  // CREATE ADMIN BOOKING
+      if (next.checkOutDate && next.checkOutDate <= value) {
+        next.checkOutDate = "";
+      }
+    }
+
+    if (name === "checkOutDate") {
+      next.room = "";
+    }
+
+    return next;
+  });
+
+  setError("");
+  setSuccess("");
+};
+
   const handleCreateBooking = async (event) => {
     event.preventDefault();
     setError("");
     setSuccess("");
 
-    if (!form.room) {
-      setError("Please select an available room.");
-      return;
-    }
-
     if (!form.checkInDate || !form.checkOutDate) {
       setError("Please select check-in and check-out dates.");
-      return;
-    }
-
-    if (form.checkOutDate <= form.checkInDate) {
-      setError("Check-out date must be after check-in date.");
       return;
     }
 
@@ -349,14 +401,48 @@ export default function AdminRoomBooking() {
       return;
     }
 
+    if (form.checkOutDate <= form.checkInDate) {
+      setError("Check-out date must be after check-in date.");
+      return;
+    }
+
+    if (!form.room) {
+      setError("Please select an available room for these dates.");
+      return;
+    }
+
     if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
       setError("Guest name, email and phone are required.");
+      return;
+    }
+
+    if (!Number.isInteger(Number(form.adults)) || Number(form.adults) < 1) {
+      setError("At least one adult is required.");
+      return;
+    }
+
+    if (!Number.isInteger(Number(form.children)) || Number(form.children) < 0) {
+      setError("Children must be zero or a positive whole number.");
+      return;
+    }
+
+    if (!form.idProofNumber.trim()) {
+      setError("ID proof number is required.");
       return;
     }
 
     setCreating(true);
 
     try {
+      console.log("Selected form dates:", {
+        checkInDate: form.checkInDate,
+        checkOutDate: form.checkOutDate,
+      });
+
+      console.log("Submitting booking dates:", {
+        checkInDate: form.checkInDate,
+        checkOutDate: form.checkOutDate,
+      });
       const payload = {
         room: form.room,
         checkInDate: form.checkInDate,
@@ -372,7 +458,7 @@ export default function AdminRoomBooking() {
           idProofNumber: form.idProofNumber.trim(),
         },
         paymentMethod: form.paymentMethod,
-        paymentReceived: form.paymentReceived,
+        paymentReceived: Boolean(form.paymentReceived),
         specialRequests: form.specialRequests.trim(),
       };
 
@@ -384,13 +470,14 @@ export default function AdminRoomBooking() {
 
       setSuccess(
         response.data?.message ||
-          "Room booking created. Check the guest email if your backend sends booking confirmations.",
+          "Booking created. Verify the confirmation email in your inbox.",
       );
 
       setForm(initialForm);
       setRooms([]);
       setShowForm(false);
-      await loadBookings();
+
+      await Promise.all([loadBookings(), loadTodayAvailableRooms()]);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -398,7 +485,6 @@ export default function AdminRoomBooking() {
     }
   };
 
-  // MARK PENDING PAYMENT AS PAID AND REQUEST EMAIL FROM BACKEND
   const handleMarkPaid = async (booking) => {
     const paymentMethod = paymentMethods[booking._id] || "cash";
 
@@ -427,11 +513,7 @@ export default function AdminRoomBooking() {
       );
 
       await loadBookings();
-
-      setSuccess(
-        response.data?.message ||
-          "Payment updated. Check email status in the server response.",
-      );
+      setSuccess(response.data?.message || "Payment status updated.");
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -439,39 +521,6 @@ export default function AdminRoomBooking() {
     }
   };
 
-  const loadTodayAvailableRooms = async () => {
-    try {
-      setTodayRoomsLoading(true);
-
-      const today = getToday();
-
-      const response = await axios.get(`${API}/bookings/available-rooms`, {
-        params: {
-          checkInDate: today,
-          checkOutDate: today,
-        },
-        headers: getHeaders(),
-      });
-
-      const data = response.data;
-
-      setTodayRooms(
-        Array.isArray(data)
-          ? data
-          : data.rooms || data.availableRooms || data.data || [],
-      );
-    } catch (error) {
-      console.error(
-        "Today's available rooms error:",
-        error.response?.data || error.message,
-      );
-      setTodayRooms([]);
-    } finally {
-      setTodayRoomsLoading(false);
-    }
-  };
-
-  // FILTER AND SORT
   const filteredBookings = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
@@ -524,9 +573,7 @@ export default function AdminRoomBooking() {
     (booking) => !isPreviousBooking(booking, today),
   ).length;
 
-  const previousCount = bookings.filter((booking) =>
-    isPreviousBooking(booking, today),
-  ).length;
+  const previousCount = bookings.length - upcomingCount;
 
   const renderPaymentActions = (booking) => {
     const pending =
@@ -565,7 +612,7 @@ export default function AdminRoomBooking() {
               type="button"
               disabled={payingId === booking._id}
               onClick={() => handleMarkPaid(booking)}
-              className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
             >
               {payingId === booking._id ? "Updating..." : "Mark Paid"}
             </button>
@@ -627,11 +674,14 @@ export default function AdminRoomBooking() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={loadBookings}
-              disabled={loadingBookings}
+              onClick={() => {
+                loadBookings();
+                loadTodayAvailableRooms();
+              }}
+              disabled={loadingBookings || todayRoomsLoading}
               className="rounded-lg border bg-white px-4 py-2 text-sm font-semibold hover:bg-gray-100 disabled:opacity-50"
             >
-              {loadingBookings ? "Refreshing..." : "↻ Refresh"}
+              Refresh
             </button>
 
             <button
@@ -647,69 +697,6 @@ export default function AdminRoomBooking() {
             </button>
           </div>
         </header>
-
-        <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">
-                Today's Available Rooms
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Rooms available for today's check-in
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={loadTodayAvailableRooms}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-            >
-              Refresh
-            </button>
-          </div>
-
-          {todayRoomsLoading ? (
-            <p className="py-5 text-center text-gray-500">
-              Loading available rooms...
-            </p>
-          ) : todayRooms.length === 0 ? (
-            <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
-              No available rooms found for today.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {todayRooms.map((room) => (
-                <div
-                  key={room._id}
-                  className="rounded-xl border border-green-200 bg-green-50 p-4"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-bold text-gray-900">
-                      Room {room.roomNumber || room.number || "N/A"}
-                    </h3>
-
-                    <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
-                      Available
-                    </span>
-                  </div>
-
-                  <p className="mt-2 text-sm text-gray-600">
-                    Type: {room.roomType?.name || room.type || "Standard"}
-                  </p>
-
-                  <p className="mt-1 text-sm text-gray-600">
-                    Price: ₹{room.price ?? room.roomType?.basePrice ?? 0} /
-                    night
-                  </p>
-
-                  <p className="mt-1 text-sm text-gray-600">
-                    Capacity: {room.roomType?.capacity ?? "N/A"} guests
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
 
         {error && (
           <div
@@ -730,6 +717,71 @@ export default function AdminRoomBooking() {
           </div>
         )}
 
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Today's Available Rooms
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Availability for {formatDate(getToday())} to{" "}
+                {formatDate(getTomorrow())}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={loadTodayAvailableRooms}
+              disabled={todayRoomsLoading}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {todayRoomsLoading ? "Loading..." : "Refresh"}
+            </button>
+          </div>
+
+          {todayRoomsLoading ? (
+            <p className="py-5 text-center text-gray-500">
+              Loading available rooms...
+            </p>
+          ) : todayRooms.length === 0 ? (
+            <p className="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
+              No available rooms found for this date range.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {todayRooms.map((room) => {
+                const type = getRoomType(room);
+
+                return (
+                  <div
+                    key={room._id}
+                    className="rounded-xl border border-green-200 bg-green-50 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-bold text-gray-900">
+                        Room {room.roomNumber || room.number || "N/A"}
+                      </h3>
+                      <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
+                        Available
+                      </span>
+                    </div>
+
+                    <p className="mt-2 text-sm text-gray-600">
+                      Type: {type.name || room.type || "Standard"}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Price: {money(room.price ?? type.basePrice)} / night
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Capacity: {type.capacity ?? "N/A"} guests
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         {showForm && (
           <section className="rounded-2xl border bg-white p-5 shadow-sm sm:p-6">
             <h2 className="mb-5 text-xl font-bold">Create Guest Booking</h2>
@@ -737,11 +789,13 @@ export default function AdminRoomBooking() {
             <form onSubmit={handleCreateBooking} className="space-y-6">
               <div>
                 <h3 className="mb-3 font-semibold">Stay Details</h3>
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <label className="text-sm">
                     <span className="mb-1 block font-medium">
                       Check-in Date *
                     </span>
+
                     <input
                       type="date"
                       name="checkInDate"
@@ -757,10 +811,15 @@ export default function AdminRoomBooking() {
                     <span className="mb-1 block font-medium">
                       Check-out Date *
                     </span>
+
                     <input
                       type="date"
                       name="checkOutDate"
-                      min={form.checkInDate || today}
+                      min={
+                        form.checkInDate
+                          ? getTomorrowFrom(form.checkInDate)
+                          : getTomorrow()
+                      }
                       value={form.checkOutDate}
                       onChange={handleChange}
                       required
@@ -774,6 +833,7 @@ export default function AdminRoomBooking() {
                       type="number"
                       name="adults"
                       min="1"
+                      step="1"
                       value={form.adults}
                       onChange={handleChange}
                       required
@@ -787,6 +847,7 @@ export default function AdminRoomBooking() {
                       type="number"
                       name="children"
                       min="0"
+                      step="1"
                       value={form.children}
                       onChange={handleChange}
                       className="w-full rounded-lg border p-2.5"
@@ -824,15 +885,21 @@ export default function AdminRoomBooking() {
                       : "Select an available room"}
                   </option>
 
-                  {rooms.map((room) => (
-                    <option key={room._id} value={room._id}>
-                      Room {room.roomNumber}
-                      {room.floor !== undefined ? ` | Floor ${room.floor}` : ""}
-                      {room.price || room.roomType?.basePrice
-                        ? ` | ${money(room.price || room.roomType?.basePrice)} / night`
-                        : ""}
-                    </option>
-                  ))}
+                  {rooms.map((room) => {
+                    const type = getRoomType(room);
+
+                    return (
+                      <option key={room._id} value={room._id}>
+                        Room {room.roomNumber}
+                        {room.floor !== undefined
+                          ? ` | Floor ${room.floor}`
+                          : ""}
+                        {room.price != null || type.basePrice != null
+                          ? ` | ${money(room.price ?? type.basePrice)} / night`
+                          : ""}
+                      </option>
+                    );
+                  })}
                 </select>
 
                 {!loadingRooms &&
@@ -893,7 +960,7 @@ export default function AdminRoomBooking() {
                       name="address"
                       value={form.address}
                       onChange={handleChange}
-                      rows="2"
+                      rows={2}
                       className="w-full rounded-lg border p-2.5"
                       placeholder="Guest address"
                       required
@@ -979,7 +1046,7 @@ export default function AdminRoomBooking() {
                   name="specialRequests"
                   value={form.specialRequests}
                   onChange={handleChange}
-                  rows="3"
+                  rows={3}
                   className="w-full rounded-lg border p-2.5"
                   placeholder="Any special requirements..."
                 />
@@ -989,7 +1056,7 @@ export default function AdminRoomBooking() {
                 <button
                   type="submit"
                   disabled={creating || loadingRooms}
-                  className="rounded-lg bg-amber-700 px-6 py-3 font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg bg-amber-700 px-6 py-3 font-semibold text-white hover:bg-amber-800 disabled:opacity-50"
                 >
                   {creating ? "Creating Booking..." : "Create Booking"}
                 </button>
@@ -1015,7 +1082,7 @@ export default function AdminRoomBooking() {
             <div>
               <h2 className="text-xl font-bold">Room Booking Records</h2>
               <p className="mt-1 text-sm text-gray-500">
-                Upcoming and previous stays, guest details, payment and
+                Upcoming and previous stays, guest details, payments and
                 receipts.
               </p>
             </div>
@@ -1090,7 +1157,6 @@ export default function AdminRoomBooking() {
             </div>
           ) : (
             <>
-              {/* DESKTOP TABLE */}
               <div className="hidden overflow-x-auto rounded-xl border lg:block">
                 <table className="w-full min-w-[1350px] text-left text-sm">
                   <thead className="bg-gray-100 text-gray-700">
@@ -1105,7 +1171,6 @@ export default function AdminRoomBooking() {
                       <th className="p-3">Payment / Actions</th>
                     </tr>
                   </thead>
-
                   <tbody className="divide-y">
                     {filteredBookings.map((booking) => (
                       <tr
@@ -1153,7 +1218,6 @@ export default function AdminRoomBooking() {
                 </table>
               </div>
 
-              {/* MOBILE / TABLET CARDS */}
               <div className="grid grid-cols-1 gap-4 lg:hidden">
                 {filteredBookings.map((booking) => (
                   <article key={booking._id} className="rounded-xl border p-4">
@@ -1201,4 +1265,14 @@ export default function AdminRoomBooking() {
       </div>
     </div>
   );
+}
+
+function getTomorrowFrom(dateString) {
+  if (!dateString) return getTomorrow();
+
+  const [year, month, day] = dateString.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + 1);
+
+  return formatLocalDate(date);
 }

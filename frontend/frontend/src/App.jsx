@@ -22,7 +22,7 @@ import AdminMenu from "./pages/AdminMenu";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminStaff from "./pages/AdminStaff";
 import AdminBookings from "./pages/AdminBookings";
-import AdminRooms from "./pages/AdminRooms";
+// import AdminRooms from "./pages/AdminRooms";
 import AdminRoomTypes from "./pages/AdminRoomTypes";
 import AdminRoomBooking from "./pages/AdminRoomBooking";
 import AdminLayout from "./components/AdminLayout";
@@ -63,7 +63,8 @@ function App() {
 
   // Theme
   const [theme, setTheme] = useState(() => {
-    const initialTheme = localStorage.getItem("hotel-theme") === "light" ? "light" : "dark";
+    const initialTheme =
+      localStorage.getItem("hotel-theme") === "light" ? "light" : "dark";
     document.documentElement.dataset.theme = initialTheme;
     return initialTheme;
   });
@@ -262,7 +263,8 @@ function App() {
         </header>
       )}
 
-      {(!isLoggedIn || isCustomer) && renderThemeToggle("theme-toggle theme-toggle-float")}
+      {(!isLoggedIn || isCustomer) &&
+        renderThemeToggle("theme-toggle theme-toggle-float")}
 
       <div
         className={
@@ -374,9 +376,9 @@ function App() {
             <Route path="staff" element={<AdminStaff />} />
             <Route path="menu" element={<AdminMenu />} />
             <Route path="bookings" element={<AdminBookings />} />
-            <Route path="rooms" element={<AdminRooms />} />
+            
+<Route path="rooms" element={<AdminRoomTypes />} />
 
-            <Route path="room-types" element={<AdminRoomTypes />} />
 
             <Route path="room-booking" element={<AdminRoomBooking />} />
 

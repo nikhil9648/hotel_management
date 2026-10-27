@@ -1,8 +1,32 @@
+
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
+import {
+  RefreshCw,
+  Package,
+  MapPin,
+  Phone,
+  Navigation,
+  ShieldCheck,
+  Truck,
+  Clock3,
+  CheckCircle2,
+  CreditCard,
+  AlertCircle,
+  ChefHat,
+  Route,
+  MapPinned,
+  ExternalLink,
+} from "lucide-react";
 
 const API = "http://localhost:5000/api";
 const REFRESH_INTERVAL = 10000;
+
+const normalizeStatus = (value) =>
+  String(value || "pending")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
 
 export default function DeliveryBoyDashboard() {
   const [orders, setOrders] = useState([]);
@@ -17,20 +41,22 @@ export default function DeliveryBoyDashboard() {
     localStorage.getItem("token") ||
     localStorage.getItem("userToken");
 
-  const getHeaders = useCallback(() => {
-    return {
+  const getHeaders = useCallback(
+    () => ({
       headers: {
         Authorization: `Bearer ${token}`,
       },
-    };
-  }, [token]);
+    }),
+    [token]
+  );
 
-  // Fetch active orders assigned to the logged-in delivery boy.
+  // Fetch active orders assigned to the logged-in delivery partner.
   const fetchOrders = useCallback(
     async (showRefreshing = false) => {
       if (!token) {
         setError("Session expired. Please log in again.");
         setLoading(false);
+        setRefreshing(false);
         return;
       }
 
@@ -46,21 +72,20 @@ export default function DeliveryBoyDashboard() {
           ? data
           : data.orders || data.data || [];
 
-        // Only active delivery orders should appear here.
         const activeOrders = fetchedOrders.filter((order) => {
-  const status = String(
-    order.status || order.orderStatus || ""
-  ).toLowerCase();
+          const status = normalizeStatus(
+            order.status || order.orderStatus
+          );
 
-  return [
-    "confirmed",
-    "preparing",
-    "ready",
-    "out_for_delivery",
-  ].includes(status);
-});
+          return [
+            "confirmed",
+            "preparing",
+            "ready",
+            "out_for_delivery",
+          ].includes(status);
+        });
 
-setOrders(activeOrders);
+        setOrders(activeOrders);
         setError("");
       } catch (err) {
         console.error("Fetch delivery orders error:", err);
@@ -77,16 +102,104 @@ setOrders(activeOrders);
     [token, getHeaders]
   );
 
-  // Initial fetch and automatic refresh every 10 seconds.
   useEffect(() => {
     fetchOrders();
 
-    const interval = setInterval(() => {
+    const intervalId = setInterval(() => {
       fetchOrders();
     }, REFRESH_INTERVAL);
 
-    return () => clearInterval(interval);
+    return () => clearInterval(intervalId);
   }, [fetchOrders]);
+
+  // Read the delivery address saved with the order.
+  // Supports common string and object address formats.
+  const getAddress = (order) => {
+    const address =
+      order.deliveryAddress ||
+      order.shippingAddress ||
+      order.customerAddress ||
+      order.address ||
+      order.customer?.address;
+
+    if (typeof address === "string") {
+      return address.trim();
+    }
+
+    if (address && typeof address === "object") {
+      // Prefer the complete saved address if present.
+      const fullAddress =
+        address.fullAddress ||
+        address.formattedAddress;
+
+      if (fullAddress) {
+        return String(fullAddress).trim();
+      }
+
+      const parts = [
+        address.houseNumber,
+        address.flatNumber,
+        address.building,
+        address.street,
+        address.addressLine1,
+        address.addressLine2,
+        address.area,
+        address.locality,
+        address.landmark,
+        address.city,
+        address.district,
+        address.state,
+        address.pincode || address.pinCode || address.postalCode,
+        address.country,
+      ];
+
+      return [
+        ...new Set(
+          parts
+            .filter(Boolean)
+            .map((part) => String(part).trim())
+        ),
+      ].join(", ");
+    }
+
+    return "";
+  };
+
+  // Open Google Maps from the delivery partner's current GPS
+  // location to the saved delivery address for this order.
+  const getDirections = (order) => {
+    const address = getAddress(order);
+
+    if (!address) {
+      setError(
+        "Is order ka saved delivery address API response mein nahi mila. Backend controller aur Order model check karo."
+      );
+      setSuccess("");
+      return;
+    }
+
+    setError("");
+    setSuccess("");
+
+    const destination = encodeURIComponent(address);
+
+    const mapsUrl =
+      "https://www.google.com/maps/dir/?api=1" +
+      `&destination=${destination}` +
+      "&travelmode=driving";
+
+    // Open the Maps app or browser without blocking the current page.
+    const newWindow = window.open(
+      mapsUrl,
+      "_blank",
+      "noopener,noreferrer"
+    );
+
+    // Fallback if the browser blocks the new tab.
+    if (!newWindow) {
+      window.location.href = mapsUrl;
+    }
+  };
 
   // Verify customer OTP and complete delivery.
   const verifyOtp = async (orderId) => {
@@ -118,8 +231,6 @@ setOrders(activeOrders);
         [orderId]: "",
       }));
 
-      // Refetch active orders; delivered order will disappear
-      // when the backend excludes delivered orders.
       await fetchOrders();
     } catch (err) {
       console.error("OTP verification error:", err);
@@ -134,10 +245,12 @@ setOrders(activeOrders);
   };
 
   const getStatus = (order) =>
-    (order.status || order.orderStatus || "pending").toLowerCase();
+    normalizeStatus(order.status || order.orderStatus);
 
   const getStatusStyle = (status) => {
     const styles = {
+      confirmed: "bg-blue-100 text-blue-800",
+      preparing: "bg-amber-100 text-amber-800",
       ready: "bg-cyan-100 text-cyan-800",
       out_for_delivery: "bg-orange-100 text-orange-800",
     };
@@ -163,38 +276,10 @@ setOrders(activeOrders);
     order.customer?.mobile ||
     order.customer?.phone ||
     order.phone ||
-    "Not available";
+    "";
 
-  const getAddress = (order) => {
-    const address =
-      order.deliveryAddress ||
-      order.address ||
-      order.customer?.address;
-
-    if (typeof address === "string") return address;
-
-    if (address && typeof address === "object") {
-      return (
-        address.fullAddress ||
-        address.address ||
-        [
-          address.houseNumber,
-          address.street,
-          address.area,
-          address.city,
-          address.state,
-          address.pincode,
-        ]
-          .filter(Boolean)
-          .join(", ") ||
-        "Address not available"
-      );
-    }
-
-    return "Address not available";
-  };
-
-  const getItems = (order) => order.items || order.orderItems || [];
+  const getItems = (order) =>
+    order.items || order.orderItems || [];
 
   const getItemName = (item) =>
     item.name ||
@@ -203,12 +288,14 @@ setOrders(activeOrders);
     "Food item";
 
   const getItemTotal = (item) => {
-    if (item.total != null) return Number(item.total);
+    if (item.total != null) {
+      return Number(item.total);
+    }
 
-    const price = Number(item.price ?? item.food?.price ?? 0);
-    const quantity = Number(item.quantity || 1);
-
-    return price * quantity;
+    return (
+      Number(item.price ?? item.food?.price ?? 0) *
+      Number(item.quantity || 1)
+    );
   };
 
   const getTotal = (order) =>
@@ -227,11 +314,25 @@ setOrders(activeOrders);
     order.payment?.method ||
     "";
 
+  const getOrderDate = (order) => {
+    if (!order.createdAt) return "";
+
+    const date = new Date(order.createdAt);
+
+    if (Number.isNaN(date.getTime())) return "";
+
+    return date.toLocaleString("en-IN", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+
           <p className="font-medium text-slate-600">
             Loading your deliveries...
           </p>
@@ -240,11 +341,10 @@ setOrders(activeOrders);
     );
   }
 
-  const pendingOtpCount = orders.length;
-
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-10">
+    <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900 sm:px-6 lg:px-10">
       <div className="mx-auto max-w-7xl">
+
         {/* Header */}
         <header className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
@@ -252,12 +352,12 @@ setOrders(activeOrders);
               Delivery Partner Portal
             </p>
 
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+            <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
               My Deliveries
             </h1>
 
             <p className="mt-2 text-sm text-slate-500 sm:text-base">
-              Manage your assigned orders and confirm deliveries securely.
+              Manage orders, navigate to customers, and verify deliveries.
             </p>
           </div>
 
@@ -267,42 +367,53 @@ setOrders(activeOrders);
             disabled={refreshing}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <span>{refreshing ? "⏳" : "↻"}</span>
+            <RefreshCw
+              size={18}
+              className={refreshing ? "animate-spin" : ""}
+            />
+
             {refreshing ? "Refreshing..." : "Refresh Orders"}
           </button>
         </header>
 
-        {/* Alerts */}
+        {/* Error alert */}
         {error && (
           <div
             role="alert"
             className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
           >
-            <span>{error}</span>
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
 
             <button
               type="button"
               onClick={() => setError("")}
-              className="font-bold"
               aria-label="Dismiss error"
+              className="font-bold"
             >
               ×
             </button>
           </div>
         )}
 
+        {/* Success alert */}
         {success && (
           <div
             role="status"
             className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700"
           >
-            <span>✓ {success}</span>
+            <div className="flex items-start gap-2">
+              <CheckCircle2 size={18} className="shrink-0" />
+              <span>{success}</span>
+            </div>
 
             <button
               type="button"
               onClick={() => setSuccess("")}
-              className="font-bold"
               aria-label="Dismiss success"
+              className="font-bold"
             >
               ×
             </button>
@@ -311,56 +422,32 @@ setOrders(activeOrders);
 
         {/* Summary cards */}
         <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">
-              Active Deliveries
-            </p>
+          <SummaryCard
+            label="Active Deliveries"
+            value={orders.length}
+            icon={<Package size={22} />}
+            iconClass="bg-blue-50 text-blue-600"
+          />
 
-            <div className="mt-3 flex items-end justify-between">
-              <h2 className="text-4xl font-extrabold text-slate-900">
-                {orders.length}
-              </h2>
+          <SummaryCard
+            label="Pending OTP Verification"
+            value={orders.length}
+            icon={<ShieldCheck size={22} />}
+            iconClass="bg-amber-50 text-amber-600"
+          />
 
-              <span className="rounded-xl bg-blue-50 p-3 text-xl">
-                📦
-              </span>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">
-              Pending OTP Verification
-            </p>
-
-            <div className="mt-3 flex items-end justify-between">
-              <h2 className="text-4xl font-extrabold text-amber-600">
-                {pendingOtpCount}
-              </h2>
-
-              <span className="rounded-xl bg-amber-50 p-3 text-xl">
-                🔐
-              </span>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">
-              Dashboard Status
-            </p>
-
-            <p className="mt-4 text-lg font-bold text-emerald-600">
-              ● Connected
-            </p>
-
-            <p className="mt-1 text-xs text-slate-400">
-              Auto-refresh every 10 seconds
-            </p>
-          </div>
+          <SummaryCard
+            label="Dashboard Status"
+            value="Connected"
+            subtitle="Auto-refresh every 10 seconds"
+            icon={<Truck size={22} />}
+            iconClass="bg-emerald-50 text-emerald-600"
+          />
         </section>
 
-        {/* Orders heading */}
+        {/* Assigned orders heading */}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-bold text-slate-900">
+          <h2 className="text-xl font-bold">
             Assigned Orders
           </h2>
 
@@ -372,25 +459,26 @@ setOrders(activeOrders);
         {/* Empty state */}
         {orders.length === 0 ? (
           <section className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-            <div className="mb-4 text-5xl">🛵</div>
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+              <Truck size={32} />
+            </div>
 
-            <h3 className="text-xl font-bold text-slate-800">
+            <h3 className="text-xl font-bold">
               No Active Deliveries
             </h3>
 
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
               Orders assigned by the admin will appear here.
-              Once an order is delivered and its OTP is verified,
-              it will disappear from this active list.
+              Completed deliveries will be removed from this active list.
             </p>
 
             <button
               type="button"
               onClick={() => fetchOrders(true)}
               disabled={refreshing}
-              className="mt-6 rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
+              className="mt-6 rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
             >
-              {refreshing ? "Checking..." : "Check Again"}
+              Check Again
             </button>
           </section>
         ) : (
@@ -399,59 +487,65 @@ setOrders(activeOrders);
               const orderId = order._id;
               const status = getStatus(order);
               const items = getItems(order);
+              const address = getAddress(order);
+              const phone = getCustomerPhone(order);
 
               return (
                 <article
                   key={orderId}
                   className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md"
                 >
-                  {/* Order heading */}
+                  {/* Order header */}
                   <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 p-5 sm:p-6">
                     <div className="min-w-0">
                       <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
                         Order ID
                       </p>
 
-                      <h3 className="mt-1 break-all text-lg font-extrabold text-slate-900">
+                      <h3 className="mt-1 break-all text-lg font-extrabold">
                         {order.orderNumber || orderId}
                       </h3>
 
-                      <p className="mt-2 text-sm text-slate-500">
+                      <p className="mt-2 text-sm text-slate-600">
                         {getCustomerName(order)}
                       </p>
 
-                      {order.createdAt && (
-                        <p className="mt-1 text-xs text-slate-400">
-                          {new Date(order.createdAt).toLocaleString("en-IN")}
+                      {getOrderDate(order) && (
+                        <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+                          <Clock3 size={13} />
+                          {getOrderDate(order)}
                         </p>
                       )}
                     </div>
 
                     <span
-                      className={`rounded-full px-3 py-1.5 text-xs font-bold capitalize ${getStatusStyle(status)}`}
+                      className={`rounded-full px-3 py-1.5 text-xs font-bold ${getStatusStyle(status)}`}
                     >
                       {status.replaceAll("_", " ")}
                     </span>
                   </div>
 
                   <div className="space-y-5 p-5 sm:p-6">
-                    {/* Customer details */}
-                    <div className="space-y-4">
-                      <div className="flex gap-3">
-                        <span className="text-lg">📞</span>
 
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold uppercase text-slate-400">
+                    {/* Customer contact */}
+                    <section className="space-y-4">
+                      <div className="flex gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                          <Phone size={19} />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                             Customer Phone
                           </p>
 
-                          <p className="mt-1 break-words text-sm font-medium text-slate-800">
-                            {getCustomerPhone(order)}
+                          <p className="mt-1 break-words text-sm font-semibold">
+                            {phone || "Not available"}
                           </p>
 
-                          {getCustomerPhone(order) !== "Not available" && (
+                          {phone && (
                             <a
-                              href={`tel:${getCustomerPhone(order)}`}
+                              href={`tel:${phone}`}
                               className="mt-1 inline-block text-xs font-semibold text-blue-600 hover:underline"
                             >
                               Call Customer
@@ -460,24 +554,64 @@ setOrders(activeOrders);
                         </div>
                       </div>
 
+                      {/* Saved delivery address */}
                       <div className="flex gap-3">
-                        <span className="text-lg">📍</span>
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
+                          <MapPin size={19} />
+                        </div>
 
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold uppercase text-slate-400">
-                            Delivery Address
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            Customer Delivery Address
                           </p>
 
                           <p className="mt-1 break-words text-sm leading-6 text-slate-700">
-                            {getAddress(order)}
+                            {address || "Saved delivery address not returned by API"}
                           </p>
+
+                          {address && (
+                            <button
+                              type="button"
+                              onClick={() => getDirections(order)}
+                              className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline"
+                            >
+                              <MapPinned size={14} />
+                              Navigate to this address
+                              <ExternalLink size={12} />
+                            </button>
+                          )}
                         </div>
                       </div>
-                    </div>
+                    </section>
+
+                    {/* Get Directions */}
+                    <button
+                      type="button"
+                      onClick={() => getDirections(order)}
+                      disabled={!address}
+                      className="group flex w-full items-center gap-3 rounded-2xl bg-blue-600 p-4 text-left text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white/15 transition group-hover:bg-white/20">
+                        <Navigation size={25} />
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-bold">
+                          Get Directions
+                        </span>
+
+                        <span className="mt-1 block text-xs leading-5 text-blue-100">
+                          Google Maps · Route to customer location
+                        </span>
+                      </span>
+
+                      <Route size={22} className="shrink-0" />
+                    </button>
 
                     {/* Order items */}
-                    <div className="rounded-xl bg-slate-50 p-4">
-                      <h4 className="mb-3 text-sm font-bold text-slate-800">
+                    <section className="rounded-xl bg-slate-50 p-4">
+                      <h4 className="mb-3 flex items-center gap-2 text-sm font-bold">
+                        <ChefHat size={17} className="text-slate-500" />
                         Order Items
                       </h4>
 
@@ -500,35 +634,30 @@ setOrders(activeOrders);
                                 </span>
                               </span>
 
-                              <span className="shrink-0 font-medium text-slate-800">
+                              <span className="shrink-0 font-semibold text-slate-800">
                                 {formatCurrency(getItemTotal(item))}
                               </span>
                             </div>
                           ))}
                         </div>
                       )}
-                    </div>
+                    </section>
 
                     {/* Payment details */}
-                    <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-5">
+                    <section className="flex items-center justify-between gap-3 border-b border-slate-100 pb-5">
                       <div>
-                        <p className="text-xs font-medium text-slate-500">
+                        <p className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                          <CreditCard size={15} />
                           Payment Status
                         </p>
 
-                        <p className="mt-1 text-sm font-semibold capitalize text-slate-800">
-                          {String(getPaymentStatus(order)).replaceAll(
-                            "_",
-                            " "
-                          )}
+                        <p className="mt-1 text-sm font-semibold capitalize">
+                          {String(getPaymentStatus(order)).replaceAll("_", " ")}
                         </p>
 
                         {getPaymentMethod(order) && (
                           <p className="mt-1 text-xs capitalize text-slate-500">
-                            {String(getPaymentMethod(order)).replaceAll(
-                              "_",
-                              " "
-                            )}
+                            {String(getPaymentMethod(order)).replaceAll("_", " ")}
                           </p>
                         )}
                       </div>
@@ -542,20 +671,21 @@ setOrders(activeOrders);
                           {formatCurrency(getTotal(order))}
                         </p>
                       </div>
-                    </div>
+                    </section>
 
                     {/* OTP verification */}
-                    <div>
-                      <label
-                        htmlFor={`otp-${orderId}`}
-                        className="mb-2 block text-sm font-bold text-slate-800"
-                      >
-                        Customer Delivery OTP
-                      </label>
+                    <section>
+                      <div className="mb-3 flex items-center gap-2">
+                        <ShieldCheck className="text-emerald-600" size={21} />
+
+                        <h4 className="text-sm font-bold text-slate-800">
+                          Customer Delivery OTP
+                        </h4>
+                      </div>
 
                       <p className="mb-3 text-xs leading-5 text-slate-500">
-                        Customer se OTP lekar enter karo. Server OTP
-                        verify hone ke baad hi delivery complete hogi.
+                        Customer se OTP lekar enter karo. Delivery tabhi
+                        complete hogi jab server OTP verify karega.
                       </p>
 
                       <form
@@ -573,7 +703,7 @@ setOrders(activeOrders);
                           maxLength={4}
                           pattern="[0-9]{4}"
                           placeholder="Enter 4-digit OTP"
-                          aria-label={`Delivery OTP for order ${order.orderNumber || orderId}`}
+                          aria-label="Customer delivery OTP"
                           value={otpValues[orderId] || ""}
                           onChange={(event) => {
                             const value = event.target.value
@@ -585,7 +715,7 @@ setOrders(activeOrders);
                               [orderId]: value,
                             }));
                           }}
-                          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-lg font-bold tracking-[0.3em] text-slate-900 outline-none transition placeholder:tracking-normal placeholder:font-normal focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-center text-lg font-bold tracking-[0.3em] outline-none transition placeholder:tracking-normal placeholder:font-normal focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                         />
 
                         <button
@@ -602,19 +732,55 @@ setOrders(activeOrders);
                         </button>
                       </form>
 
-                      <p className="mt-3 text-xs text-slate-400">
-                        The order is removed from Active Orders after
-                        successful server-side OTP verification.
+                      <p className="mt-3 text-xs leading-5 text-slate-400">
+                        Successful server-side verification removes the
+                        completed order from active deliveries.
                       </p>
-                    </div>
+                    </section>
                   </div>
                 </article>
               );
             })}
           </section>
         )}
+
+        {/* Footer */}
+        <footer className="mt-10 border-t border-slate-200 py-6 text-center text-sm text-slate-500">
+          Delivery Partner Dashboard · Safe delivery, happy customers.
+        </footer>
       </div>
     </main>
   );
 }
 
+function SummaryCard({ label, value, subtitle, icon, iconClass }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-slate-500">
+          {label}
+        </p>
+
+        <span className={`rounded-xl p-3 ${iconClass}`}>
+          {icon}
+        </span>
+      </div>
+
+      <h2
+        className={`mt-3 font-extrabold tracking-tight ${
+          typeof value === "number"
+            ? "text-4xl text-slate-900"
+            : "text-xl text-emerald-600"
+        }`}
+      >
+        {value}
+      </h2>
+
+      {subtitle && (
+        <p className="mt-2 text-xs text-slate-400">
+          {subtitle}
+        </p>
+      )}
+    </div>
+  );
+}
