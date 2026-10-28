@@ -598,6 +598,7 @@ if (couponCode && String(couponCode).trim()) {
                 req.user?.role === "waiter" ? req.user._id : null,
             parentOrder: originalOrder?._id || null,
             orderType: resolvedOrderType,
+            createdBy: req.user._id,
             couponCode: appliedCoupon?.code || null,
 discountAmount,
             deliveryAddress:
@@ -683,13 +684,21 @@ discountAmount,
 // =====================================================
 
 // GET /api/restaurant-orders/history
+
 const getRestaurantOrderHistory = async (req, res) => {
     try {
-        if (
-            !["admin", "manager", "accountant"].includes(
-                req.user?.role
-            )
-        ) {
+        const role = String(req.user?.role || "").toLowerCase();
+
+        // Admin ka access same: saare orders dekh sakta hai.
+        const allowedRoles = [
+            "admin",
+            "manager",
+            "accountant",
+            "receptionist",
+            "reception",
+        ];
+
+        if (!allowedRoles.includes(role)) {
             return sendError(
                 res,
                 403,
@@ -697,8 +706,16 @@ const getRestaurantOrderHistory = async (req, res) => {
             );
         }
 
+        // Admin, manager aur accountant ko poori history.
+        // Receptionist ko sirf apne banaye hue orders.
+        const filter = {};
+
+        if (["receptionist", "reception"].includes(role)) {
+            filter.createdBy = req.user._id;
+        }
+
         const orders = await populateOrder(
-            RestaurantOrder.find({}).sort({
+            RestaurantOrder.find(filter).sort({
                 createdAt: -1,
             })
         );
@@ -709,7 +726,10 @@ const getRestaurantOrderHistory = async (req, res) => {
             orders,
         });
     } catch (error) {
-        console.error("Get Restaurant Order History Error:", error);
+        console.error(
+            "Get Restaurant Order History Error:",
+            error
+        );
 
         return sendError(
             res,
@@ -718,6 +738,7 @@ const getRestaurantOrderHistory = async (req, res) => {
         );
     }
 };
+
 
 const getMyRestaurantOrders = async (req, res) => {
     try {
@@ -836,38 +857,54 @@ const getTableOrders = async (req, res) => {
 // GET ALL ORDERS
 // =====================================================
 
+
 const getAllRestaurantOrders = async (req, res) => {
-    try {
-        if (
-            !["admin", "manager", "kitchen", "accountant"].includes(
-                req.user?.role
-            )
-        ) {
-            return sendError(res, 403, "Not allowed to view all orders");
-        }
+  try {
+    const role = String(req.user?.role || "").toLowerCase();
 
-        const filter = { billGenerated: { $ne: true } };
+    const allowedRoles = [
+      "admin",
+      "manager",
+      "kitchen",
+      "accountant",
+      "receptionist",
+      "reception",
+    ];
 
-        if (req.query.status) {
-            if (!VALID_ORDER_STATUSES.includes(req.query.status)) {
-                return sendError(res, 400, "Invalid order status");
-            }
-            filter.orderStatus = req.query.status;
-        }
-
-        const orders = await populateOrder(
-            RestaurantOrder.find(filter).sort({ createdAt: -1 })
-        );
-
-        return res.status(200).json({
-            success: true,
-            count: orders.length,
-            orders,
-        });
-    } catch (error) {
-        console.error("Get All Restaurant Orders Error:", error);
-        return sendError(res, 500, "Unable to fetch restaurant orders");
+    if (!allowedRoles.includes(role)) {
+      return sendError(res, 403, "Not allowed to view all orders");
     }
+
+    const filter = {
+      billGenerated: { $ne: true },
+    };
+
+    if (req.query.status) {
+      if (!VALID_ORDER_STATUSES.includes(req.query.status)) {
+        return sendError(res, 400, "Invalid order status");
+      }
+
+      filter.orderStatus = req.query.status;
+    }
+
+    // Reception page ko delivery orders hi dikhayein.
+    if (["receptionist", "reception"].includes(role)) {
+      filter.orderType = "delivery";
+    }
+
+    const orders = await populateOrder(
+      RestaurantOrder.find(filter).sort({ createdAt: -1 })
+    );
+
+    return res.status(200).json({
+      success: true,
+      count: orders.length,
+      orders,
+    });
+  } catch (error) {
+    console.error("Get All Restaurant Orders Error:", error);
+    return sendError(res, 500, "Unable to fetch restaurant orders");
+  }
 };
 
 // =====================================================
@@ -1325,7 +1362,7 @@ const updateRestaurantOrderPayment = async (req, res) => {
 
 const assignDeliveryBoy = async (req, res) => {
     try {
-        if (!["admin", "manager"].includes(req.user?.role)) {
+        if (!["admin", "manager","receptionist", "reception"].includes(req.user?.role)) {
             return sendError(res, 403, "Only admin or manager can assign delivery");
         }
 

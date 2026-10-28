@@ -33,7 +33,7 @@ const {
 router.post(
     "/",
     protect,
-    authorize("customer", "waiter", "admin", "manager"),
+    authorize("customer", "waiter", "admin", "manager", "receptionist", "reception"),
     createRestaurantOrder
 );
 
@@ -55,10 +55,17 @@ router.get(
 // Admin, Manager, Kitchen and Accountant
 // ========================================
 router.get(
-    "/all",
-    protect,
-    authorize("admin", "manager", "kitchen", "accountant"),
-    getAllRestaurantOrders
+  "/all",
+  protect,
+  authorize(
+    "admin",
+    "manager",
+    "kitchen",
+    "accountant",
+    "receptionist",
+    "reception"
+  ),
+  getAllRestaurantOrders
 );
 
 
@@ -79,7 +86,19 @@ router.get(
     getRestaurantOrderHistory
 );
 
-router.get("/", protect, getAllRestaurantOrders);
+router.get(
+  "/all",
+  protect,
+  authorize(
+    "admin",
+    "manager",
+    "kitchen",
+    "accountant",
+    "receptionist",
+    "reception"
+  ),
+  getAllRestaurantOrders
+);
 // ========================================
 // ADD MORE ITEMS TO EXISTING ORDER
 // Waiter, Admin and Manager
@@ -87,14 +106,14 @@ router.get("/", protect, getAllRestaurantOrders);
 router.put(
     "/:id/items",
     protect,
-    authorize("waiter", "admin", "manager"),
+    authorize("waiter", "admin", "manager","receptionist", "reception"),
     addItemsToRestaurantOrder
 );
 
 router.delete(
     "/:id/items/:itemId",
     protect,
-    authorize("admin"),
+    authorize("admin","receptionist", "reception", "manager"),
     removeRestaurantOrderItem
 );
 
@@ -105,7 +124,7 @@ router.delete(
 router.put(
     "/:id",
     protect,
-    authorize("waiter", "admin", "manager"),
+    authorize("waiter", "admin", "manager","receptionist", "reception"),
     updateRestaurantOrder
 );
 
@@ -118,7 +137,7 @@ router.put(
 router.put(
     "/:id/status",
     protect,
-    authorize("waiter", "admin", "manager", "kitchen"),
+    authorize("waiter", "admin", "manager", "kitchen","receptionist", "reception"),
     updateRestaurantOrderStatus
 );
 
@@ -130,15 +149,15 @@ router.put(
 router.put(
     "/:id/payment",
     protect,
-    authorize("admin", "manager", "accountant"),
+    authorize("admin", "manager", "accountant","receptionist", "reception"),
     updateRestaurantOrderPayment
 );
 
 router.patch(
-    "/:id/assign-delivery",
-    protect,
-    authorize("admin", "manager"),
-    assignDeliveryBoy
+  "/:id/assign-delivery",
+  protect,
+  authorize("admin", "manager", "receptionist", "reception"),
+  assignDeliveryBoy
 );
 // ========================================
 // GET SINGLE ORDER BY ID

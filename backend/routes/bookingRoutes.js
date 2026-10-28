@@ -47,7 +47,7 @@ router.post(
 router.post(
     "/admin-create",
     protect,
-    authorize("admin"),
+    authorize("admin", "reception", "receptionist"),
     adminCreateBooking
 );
 
@@ -68,7 +68,7 @@ router.get(
 router.get(
     "/",
     protect,
-    authorize("admin"),
+    authorize("admin", "reception", "receptionist"),
     getAllBookings
 );
 
@@ -77,7 +77,7 @@ router.get(
 router.patch(
     "/:id/payment",
     protect,
-    authorize("admin"),
+    authorize("admin", "reception", "receptionist"),
     updateBookingPayment
 );
 
@@ -86,7 +86,7 @@ router.patch(
 router.get(
     "/:id/invoice",
     protect,
-    authorize("admin"),
+    authorize("admin", "reception", "receptionist"),
     downloadBookingInvoice
 );
 
@@ -95,7 +95,7 @@ router.get(
 router.patch(
     "/:id/status",
     protect,
-    authorize("admin"),
+    authorize("admin", "reception", "receptionist"),
     updateBookingStatus
 );
 
@@ -104,7 +104,7 @@ router.patch(
 router.patch(
     "/:id/check-in",
     protect,
-    authorize("admin"),
+    authorize("admin", "reception", "receptionist"),
     checkInBooking
 );
 // =====================================================

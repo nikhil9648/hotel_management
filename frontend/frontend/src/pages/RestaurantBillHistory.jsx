@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
 const API = "http://localhost:5000/api";
-const ORDERS_API = `${API}/restaurant-orders/history`;
+const ORDERS_API = `${API}/restaurant-bills`;
 
 export default function RestaurantBillHistory() {
   const [orders, setOrders] = useState([]);
@@ -140,8 +140,20 @@ export default function RestaurantBillHistory() {
       const data = response.data;
 
       const fetchedOrders = Array.isArray(data)
-        ? data
-        : data?.orders || data?.restaurantOrders || data?.data || [];
+  ? data
+  : data?.bills ||
+    data?.orders ||
+    data?.restaurantOrders ||
+    data?.data?.bills ||
+    data?.data?.orders ||
+    data?.data ||
+    [];
+
+if (!Array.isArray(fetchedOrders)) {
+  throw new Error("The restaurant bills API did not return a list.");
+}
+
+setOrders(fetchedOrders);
 
       if (!Array.isArray(fetchedOrders)) {
         throw new Error(
@@ -598,7 +610,7 @@ export default function RestaurantBillHistory() {
 
           <p style={{ marginBottom: 0 }}>
             Check that the backend has a GET route for{" "}
-            <code>/api/restaurant-orders</code>.
+            <code>/api/restaurant-bills</code>
           </p>
 
           <button onClick={loadOrders} style={primaryButtonStyle}>

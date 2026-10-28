@@ -83,7 +83,12 @@ const restaurantOrderSchema = new mongoose.Schema(
           required: true,
           trim: true,
         },
-
+        createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+    index: true,
+},
         quantity: {
           type: Number,
           required: true,

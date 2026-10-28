@@ -399,34 +399,66 @@ const createBooking = async (req, res) => {
         }
 
         // 5. Normalize and validate dates
-        const checkIn = normalizeDate(checkInDate);
-        const checkOut = normalizeDate(checkOutDate);
+       
+const parseDateOnly = (value) => {
+    if (typeof value !== "string") return null;
 
-        if (!checkIn || !checkOut) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Invalid check-in or check-out date",
-            });
-        }
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return null;
 
-        if (checkOut <= checkIn) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Check-out date must be after check-in date",
-            });
-        }
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
 
-        const today = normalizeDate(new Date());
+    const date = new Date(Date.UTC(year, month - 1, day));
 
-        if (checkIn < today) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Check-in date cannot be in the past",
-            });
-        }
+    if (
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+    ) {
+        return null;
+    }
+
+    return date;
+};
+
+const checkIn = parseDateOnly(checkInDate);
+const checkOut = parseDateOnly(checkOutDate);
+
+if (!checkIn || !checkOut) {
+    return res.status(400).json({
+        success: false,
+        message: "Invalid check-in or check-out date",
+    });
+}
+
+if (checkOut <= checkIn) {
+    return res.status(400).json({
+        success: false,
+        message: "Check-out date must be after check-in date",
+    });
+}
+
+// Today's date according to India (IST).
+const now = new Date();
+const indiaNow = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+);
+
+const today = new Date(Date.UTC(
+    indiaNow.getFullYear(),
+    indiaNow.getMonth(),
+    indiaNow.getDate()
+));
+
+if (checkIn < today) {
+    return res.status(400).json({
+        success: false,
+        message: "Check-in date cannot be in the past",
+    });
+}
+
 
         // 6. Calculate number of nights
         const numberOfNights = calculateNights(

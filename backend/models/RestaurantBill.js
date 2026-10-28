@@ -33,6 +33,13 @@ const restaurantBillSchema = new mongoose.Schema(
             trim: true,
         },
 
+        createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+    index: true,
+},
+
         couponCode: {
             type: String,
             default: "",

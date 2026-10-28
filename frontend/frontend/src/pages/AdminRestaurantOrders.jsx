@@ -166,30 +166,46 @@ export default function AdminRestaurantOrders() {
 
   // Only paid orders and currently running orders are shown.
   const visibleOrders = useMemo(() => {
-    const query = search.trim().toLowerCase();
+  const query = search.trim().toLowerCase();
 
-    return orders.filter((order) => {
-      const paid = isPaid(order);
-      const current = isCurrentOrder(order);
+  return orders.filter((order) => {
+    const paymentStatus = String(
+      order.paymentStatus || "unpaid"
+    ).toLowerCase().trim();
 
-      if (!paid && !current) return false;
+    const orderStatus = String(
+      order.orderStatus || "pending"
+    ).toLowerCase().trim();
 
-      const matchesSearch = [
-        getOrderNumber(order),
-        getCustomerName(order),
-        order.customerMobile,
-        getTableName(order),
-      ].some((value) =>
-        String(value || "").toLowerCase().includes(query)
-      );
+    const current = CURRENT_STATUSES.includes(orderStatus);
 
-      const matchesStatus =
-        statusFilter === "all" ||
-        order.orderStatus === statusFilter;
+    const paymentPending = [
+      "unpaid",
+      "partially_paid",
+      "pending",
+    ].includes(paymentStatus);
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [orders, search, statusFilter]);
+    if (!current || !paymentPending) return false;
+
+    const searchableText = [
+      getOrderNumber(order),
+      getCustomerName(order),
+      order.customerMobile,
+      getTableName(order),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    const matchesSearch = searchableText.includes(query);
+
+    const matchesStatus =
+      statusFilter === "all" ||
+      orderStatus === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+}, [orders, search, statusFilter]);
 
   // Group orders by table. Paid orders stay visible alongside current orders.
   const groupedOrders = useMemo(() => {
@@ -839,25 +855,36 @@ export default function AdminRestaurantOrders() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl bg-white p-5 shadow">
-          <p className="text-sm text-gray-500">Displayed Orders</p>
-          <p className="mt-2 text-3xl font-bold">{visibleOrders.length}</p>
-        </div>
+  <div className="rounded-xl bg-white p-5 shadow">
+    <p className="text-sm text-gray-500">
+      Current Unpaid Orders
+    </p>
+    <p className="mt-2 text-3xl font-bold">
+      {visibleOrders.length}
+    </p>
+  </div>
 
-        <div className="rounded-xl bg-white p-5 shadow">
-          <p className="text-sm text-gray-500">Running Orders</p>
-          <p className="mt-2 text-3xl font-bold">
-            {orders.filter(isCurrentOrder).length}
-          </p>
-        </div>
+  <div className="rounded-xl bg-white p-5 shadow">
+    <p className="text-sm text-gray-500">
+      Running Orders
+    </p>
+    <p className="mt-2 text-3xl font-bold">
+      {visibleOrders.filter(isCurrentOrder).length}
+    </p>
+  </div>
 
-        <div className="rounded-xl bg-white p-5 shadow">
-          <p className="text-sm text-gray-500">Paid Orders</p>
-          <p className="mt-2 text-3xl font-bold">
-            {orders.filter(isPaid).length}
-          </p>
-        </div>
-      </div>
+  <div className="rounded-xl bg-white p-5 shadow">
+    <p className="text-sm text-gray-500">
+      Payment Pending
+    </p>
+    <p className="mt-2 text-3xl font-bold">
+      {visibleOrders.filter(
+        (order) =>
+          order.paymentStatus !== "paid"
+      ).length}
+    </p>
+  </div>
+</div>
 
       <div className="flex flex-col gap-3 rounded-xl bg-white p-4 shadow md:flex-row">
         <input
@@ -872,7 +899,7 @@ export default function AdminRestaurantOrders() {
           onChange={(event) => setStatusFilter(event.target.value)}
           className="rounded-lg border p-3"
         >
-          <option value="all">Paid + current orders</option>
+          <option value="all">All Current Unpaid Orders</option>
           {ORDER_STATUSES.map((status) => (
             <option key={status} value={status}>
               {status.toUpperCase()}

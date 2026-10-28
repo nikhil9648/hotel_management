@@ -13,7 +13,7 @@ const {
 router.get(
     "/",
     protect,
-    authorize("admin", "manager"),
+    authorize("admin", "manager","reception","receptionist"),
     getActiveDeliveryBoys
 );
 

@@ -58,6 +58,10 @@ import StaffDashboard from "./pages/staff/StaffDashboard";
 import EventScanner from "./pages/staff/EventScanner";
 import EventRegistration from "./pages/EventRegistration";
 
+// Receptions
+import ReceptionLayout from "./components/ReceptionLayout";
+import ReceptionDashboard from "./pages/reception/ReceptionDashboard";
+
 function App() {
   const location = useLocation();
 
@@ -106,7 +110,7 @@ function App() {
     const dashboardPaths = {
       admin: "/admin",
       manager: "/admin",
-      receptionist: "/reception/billing",
+      receptionist: "/reception",
       waiter: "/waiter",
       kitchen: "/kitchen",
       staff: "/staff",
@@ -348,24 +352,28 @@ function App() {
             <Route path="orders" element={<KitchenOrders />} />
           </Route>
 
-          {/* Reception */}
-          <Route
-            path="/reception/billing"
-            element={staffRoute(<ReceptionBilling />, [
-              "admin",
-              "manager",
-              "receptionist",
-            ])}
-          />
+          
+{/* Reception Dashboard */}
+<Route
+  path="/reception"
+  element={staffRoute(<ReceptionLayout />, [
+    "receptionist",
+    "admin",
+    "manager",
+  ])}
+>
+  <Route index element={<ReceptionDashboard />} />
+  <Route path="billing" element={<ReceptionBilling />} />
+  <Route path="online-orders" element={<OnlineOrders />} />
+  <Route path="room-booking" element={<AdminRoomBooking />} />
+  <Route path="food-menu" element={<AdminMenu />} />
+  <Route path="restaurant-orders" element={<AdminRestaurantOrders />} />
+  <Route path="bill-history" element={<RestaurantBillHistory />} />
+  <Route path="product-billing" element={<GeneralPOS />} />
+  <Route path="general-history" element={<GeneralBillHistory />} />
+  <Route path="products" element={<GeneralProductManagement />} />
+</Route>
 
-          <Route
-            path="/restaurant-bill-history"
-            element={staffRoute(<RestaurantBillHistory />, [
-              "admin",
-              "manager",
-              "receptionist",
-            ])}
-          />
 
           {/* Admin */}
           <Route

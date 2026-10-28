@@ -250,6 +250,7 @@ const createRestaurantBill = async (req, res) => {
             billNumber,
             table: selectedTableId,
             orders: selectedOrderIds,
+            createdBy: req.user._id,
             customerName: finalCustomerName,
             customerPhone: finalCustomerPhone,
             subtotal,
@@ -628,7 +629,20 @@ const getAllRestaurantBills = async (req, res) => {
             endDate,
         } = req.query;
 
-        const filter = {};
+        const userRole = String(req.user?.role || "").toLowerCase();
+
+const isReceptionist = [
+    "receptionist",
+    "reception",
+].includes(userRole);
+
+const filter = {};
+
+// Receptionist sees only bills created by their account.
+// Admin, manager and waiter keep the existing behavior.
+if (isReceptionist) {
+    filter.createdBy = req.user._id;
+}
 
         if (paymentStatus) {
             filter.paymentStatus = paymentStatus;
@@ -702,12 +716,24 @@ const getRestaurantDashboard = async (req, res) => {
             23, 59, 59, 999
         );
 
+        const userRole = String(req.user?.role || "").toLowerCase();
+
+const isReceptionist = [
+    "receptionist",
+    "reception",
+].includes(userRole);
+
+const receptionistFilter = isReceptionist
+    ? { createdBy: req.user._id }
+    : {};
+
         const todayBills = await RestaurantBill.find({
-            createdAt: {
-                $gte: startOfToday,
-                $lte: endOfToday,
-            },
-        });
+    ...receptionistFilter,
+    createdAt: {
+        $gte: startOfToday,
+        $lte: endOfToday,
+    },
+});
 
         const totalBills = todayBills.length;
 
@@ -761,10 +787,12 @@ const getRestaurantDashboard = async (req, res) => {
             }
         }
 
-        const recentBills = await RestaurantBill.find({})
-            .populate("table", "tableNumber")
-            .sort({ createdAt: -1 })
-            .limit(10);
+        const recentBills = await RestaurantBill.find(
+    receptionistFilter
+)
+    .populate("table", "tableNumber")
+    .sort({ createdAt: -1 })
+    .limit(10);
 
         return res.status(200).json({
             success: true,

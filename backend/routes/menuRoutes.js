@@ -38,21 +38,21 @@ router.get(
 router.post(
     "/categories",
     protect,
-    authorize("admin"),
+    authorize("admin", "manager", "reception", "receptionist"),
     createCategory
 );
 
 router.put(
     "/categories/:id",
     protect,
-    authorize("admin"),
+    authorize("admin", "manager", "reception", "receptionist"),
     updateCategory
 );
 
 router.post(
     "/upload-image",
     protect,
-    authorize("admin"),
+    authorize("admin", "manager", "reception", "receptionist"),
     upload.single("image"),
     (req, res) => {
         if (!req.file) {
@@ -116,14 +116,14 @@ router.get(
 router.post(
     "/foods",
     protect,
-    authorize("admin"),
+    authorize("admin", "manager", "reception", "receptionist"),
     createFoodItem
 );
 
 router.put(
     "/foods/:id",
     protect,
-    authorize("admin"),
+    authorize("admin", "manager", "reception", "receptionist"),
     updateFoodItem
 );
 
