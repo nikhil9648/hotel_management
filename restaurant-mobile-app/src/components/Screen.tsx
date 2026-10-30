@@ -12,4 +12,8 @@ export default function Screen({ children, contentStyle }: React.PropsWithChildr
     </SafeAreaView>
   );
 }
-const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.background }, content: { flexGrow: 1, paddingBottom: 28 }, inner: { width: '100%', maxWidth: 900, alignSelf: 'center', paddingHorizontal: 18 } });
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
+  content: { flexGrow: 1, paddingBottom: 32 },
+  inner: { width: '100%', maxWidth: 920, alignSelf: 'center', paddingHorizontal: 20 },
+});

@@ -11,6 +11,8 @@ import LoginScreen from '../screens/LoginScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import BookingFormScreen from '../screens/BookingFormScreen';
 import BookingConfirmationScreen from '../screens/BookingConfirmationScreen';
+import MyBookingsScreen from '../screens/MyBookingsScreen';
+import MyOrdersScreen from '../screens/MyOrdersScreen';
 
 import { useAuth } from '../auth/AuthContext';
 import { colors } from '../utils/theme';
@@ -26,28 +28,34 @@ function MainTabs() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: {
-          height: 62,
-          paddingTop: 7,
-          paddingBottom: 7,
+          height: 72,
+          paddingTop: 8,
+          paddingBottom: 9,
           borderTopColor: colors.border,
-          backgroundColor: '#fff',
+          backgroundColor: colors.surface,
+          elevation: 12,
+          shadowColor: '#1D302B',
+          shadowOpacity: 0.08,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: -5 },
         },
         tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '700',
+          fontSize: 10,
+          fontWeight: '800',
+          marginTop: 2,
         },
         tabBarIcon: ({ color, size }) => {
           const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
-            Home: 'home-outline',
-            Menu: 'restaurant-outline',
-            Rooms: 'bed-outline',
-            Profile: 'person-circle-outline',
+            Home: color === colors.primary ? 'home' : 'home-outline',
+            Menu: color === colors.primary ? 'restaurant' : 'restaurant-outline',
+            Rooms: color === colors.primary ? 'bed' : 'bed-outline',
+            Profile: color === colors.primary ? 'person-circle' : 'person-circle-outline',
           };
 
           return (
             <Ionicons
               name={icons[route.name] || 'ellipse-outline'}
-              size={size}
+              size={size + (color === colors.primary ? 1 : 0)}
               color={color}
             />
           );
@@ -95,8 +103,10 @@ export default function RootNavigator() {
         options={{
           headerShown: true,
           title: 'Sign in',
-          headerTintColor: colors.primary,
+          headerTintColor: colors.primaryDark,
+          headerShadowVisible: false,
           headerStyle: { backgroundColor: colors.background },
+          headerTitleStyle: { color: colors.text, fontWeight: '800' },
         }}
       />
 
@@ -106,21 +116,49 @@ export default function RootNavigator() {
         options={{
           headerShown: true,
           title: 'Your stay',
-          headerTintColor: colors.primary,
+          headerTintColor: colors.primaryDark,
+          headerShadowVisible: false,
           headerStyle: { backgroundColor: colors.background },
+          headerTitleStyle: { color: colors.text, fontWeight: '800' },
         }}
       />
 
       <Stack.Screen
-  name="BookingConfirmation"
-  component={BookingConfirmationScreen}
-  options={{
-    headerShown: true,
-    title: 'Booking confirmation',
-    headerTintColor: colors.primary,
-    headerStyle: { backgroundColor: colors.background },
-  }}
-/>
+        name="BookingConfirmation"
+        component={BookingConfirmationScreen}
+        options={{
+          headerShown: true,
+          title: 'Booking confirmed',
+          headerTintColor: colors.primaryDark,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: colors.background },
+          headerTitleStyle: { color: colors.text, fontWeight: '800' },
+        }}
+      />
+      <Stack.Screen
+        name="MyBookings"
+        component={MyBookingsScreen}
+        options={{
+          headerShown: true,
+          title: 'My bookings',
+          headerTintColor: colors.primaryDark,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: colors.background },
+          headerTitleStyle: { color: colors.text, fontWeight: '800' },
+        }}
+      />
+      <Stack.Screen
+        name="MyOrders"
+        component={MyOrdersScreen}
+        options={{
+          headerShown: true,
+          title: 'My orders',
+          headerTintColor: colors.primaryDark,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: colors.background },
+          headerTitleStyle: { color: colors.text, fontWeight: '800' },
+        }}
+      />
     </Stack.Navigator>
   );
 }

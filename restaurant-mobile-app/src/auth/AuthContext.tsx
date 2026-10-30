@@ -22,7 +22,15 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       try {
         const saved = await SecureStore.getItemAsync('auth_user');
         const token = await SecureStore.getItemAsync('auth_token');
-        if (alive && saved && token) setUser(JSON.parse(saved) as AppUser);
+        if (alive && saved && token) {
+          const parsed = JSON.parse(saved) as AppUser;
+          if (['customer', 'user'].includes(String(parsed.role || '').toLowerCase())) {
+            setUser(parsed);
+          } else {
+            await SecureStore.deleteItemAsync('auth_user');
+            await SecureStore.deleteItemAsync('auth_token');
+          }
+        }
       } catch {
         await SecureStore.deleteItemAsync('auth_user');
         await SecureStore.deleteItemAsync('auth_token');
@@ -39,12 +47,16 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     const token = payload?.token || payload?.accessToken || payload?.data?.token;
     const rawUser = payload?.user || payload?.data?.user;
     if (!token || !rawUser) throw new Error(payload?.message || 'Login response did not include a user and token.');
+    const role = String(rawUser.role || 'customer').toLowerCase();
+    if (!['customer', 'user'].includes(role)) {
+      throw new Error('This app is for Hotel Maurya customers. Please use the staff workspace to sign in.');
+    }
     const nextUser: AppUser = {
       id: String(rawUser.id || rawUser._id || ''),
       name: String(rawUser.name || 'Guest'),
       email: String(rawUser.email || email.trim()),
       phone: rawUser.phone ? String(rawUser.phone) : undefined,
-      role: String(rawUser.role || 'customer').toLowerCase(),
+      role,
       isVerified: rawUser.isVerified,
     };
     await SecureStore.setItemAsync('auth_token', String(token));

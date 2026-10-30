@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import {
+  Animated,
   Image,
   ImageBackground,
   Pressable,
@@ -22,10 +23,21 @@ type Props = { navigation: any };
 
 export default function HomeScreen({ navigation }: Props) {
   const { user } = useAuth();
+  const heroEntrance = React.useRef(new Animated.Value(0)).current;
 
   const [featured, setFeatured] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const entrance = Animated.timing(heroEntrance, {
+      toValue: 1,
+      duration: 480,
+      useNativeDriver: true,
+    });
+    entrance.start();
+    return () => entrance.stop();
+  }, [heroEntrance]);
 
   useEffect(() => {
   let active = true;
@@ -101,13 +113,19 @@ export default function HomeScreen({ navigation }: Props) {
         </Text>
       </View>
 
-      <ImageBackground
-        source={require('../../assets/hotel-maurya.jpg')}
-        style={styles.hero}
-        imageStyle={styles.heroImage}
-        resizeMode="cover"
+      <Animated.View
+        style={{
+          opacity: heroEntrance,
+          transform: [{ translateY: heroEntrance.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
+        }}
       >
-        <View style={styles.heroOverlay}>
+        <ImageBackground
+          source={require('../../assets/hotel-maurya.jpg')}
+          style={styles.hero}
+          imageStyle={styles.heroImage}
+          resizeMode="cover"
+        >
+          <View style={styles.heroOverlay}>
           <View style={styles.heroBadge}>
             <Ionicons name="sparkles-outline" size={13} color="#F9DCA4" />
             <Text style={styles.heroBadgeText}>MADE WITH LOVE</Text>
@@ -128,8 +146,9 @@ export default function HomeScreen({ navigation }: Props) {
             <Text style={styles.heroButtonText}>Explore menu</Text>
             <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
           </Pressable>
-        </View>
-      </ImageBackground>
+          </View>
+        </ImageBackground>
+      </Animated.View>
 
       <View style={styles.sectionHeader}>
         <View>

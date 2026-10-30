@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
   },
   hero: {
-    minHeight: 410,
+    minHeight: 360,
     borderRadius: 24,
     overflow: 'hidden',
     backgroundColor: colors.primaryDark,
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     flex: 1,
-    minHeight: 410,
+    minHeight: 360,
     paddingHorizontal: 23,
     paddingVertical: 28,
     justifyContent: 'center',

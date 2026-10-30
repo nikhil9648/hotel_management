@@ -1,13 +1,14 @@
-
 export const colors = {
-  primary: '#E96D27',
+  primary: '#B58955',
   primaryDark: '#1D302B',
-  accent: '#C79A54',
-  background: '#FBF7EF',
-  surface: '#FFFFFF',
-  text: '#202B31',
-  muted: '#7B7D78',
-  border: '#E9E1D5',
-  success: '#23834B',
+  accent: '#D9BB8C',
+  background: '#F5F3ED',
+  surface: '#FFFEFB',
+  text: '#252923',
+  muted: '#73776F',
+  border: '#E7E3D9',
+  success: '#2B7A56',
   danger: '#B42318',
+  softGold: '#F3EBDD',
+  softGreen: '#EAF1EC',
 };

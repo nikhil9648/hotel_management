@@ -1,6 +1,6 @@
-# Maurya Hotel & Restaurant — Mobile App Starter
+# Maurya Hotel & Restaurant — Customer App
 
-A separate React Native + TypeScript + Expo project based on the uploaded website API. The existing website and backend are not included in this project and are not modified.
+A React Native + TypeScript + Expo app for Hotel Maurya customers. It uses the existing website API and keeps the customer experience focused on dining, stays, bookings, orders and profile details.
 
 ## What is included in this first milestone
 
@@ -9,8 +9,11 @@ A separate React Native + TypeScript + Expo project based on the uploaded websit
 - Secure token storage using Expo SecureStore and Bearer auth on API requests
 - Menu and category listing from `GET /api/menu/foods` and `GET /api/menu/categories`
 - Room availability lookup through the protected `GET /api/bookings/available-rooms?checkInDate=YYYY-MM-DD&checkOutDate=YYYY-MM-DD` endpoint
+- Booking creation and a customer bookings view connected to the existing booking endpoints
+- Customer order history connected to `GET /api/restaurant-orders/my-orders`
 - Responsive layout foundation and bottom-tab navigation for Android, iOS and tablets
-- Profile sign-out and role display
+- A shared Maurya cream, forest-green and warm-gold visual system across the app
+- Profile sign-out and role display; non-customer accounts are directed to the staff workspace
 
 ## Setup
 
@@ -43,9 +46,9 @@ A separate React Native + TypeScript + Expo project based on the uploaded websit
 
 ## Important limitations in this milestone
 
-- Menu browsing is connected; food cart and order submission are not yet implemented.
+- Menu browsing and order history are connected; mobile food cart and order submission are not yet implemented.
 - Room availability lookup, booking creation and Razorpay checkout are connected. Payment checkout requires a native development build and is not available in Expo Go.
-- Login uses the existing general `/api/auth/login` endpoint. Actual role-based staff screens are planned for a later milestone; backend authorization remains authoritative.
+- Login uses the existing general `/api/auth/login` endpoint, but this app only accepts customer accounts. Staff screens stay in the web workspace; backend authorization remains authoritative.
 - Room availability endpoint requires authentication and both dates, as implemented by the existing backend.
 - Images returned as relative `/uploads/...` paths are resolved against the server origin.
 
