@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Maurya Hotel & Restaurant",
+    "slug": "maurya-hotel-restaurant",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "light",
+    "scheme": "mauryaapp",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.maurya.hotelrestaurant"
+    },
+    "android": {
+      "package": "com.maurya.hotelrestaurant",
+      "adaptiveIcon": {
+        "backgroundColor": "#FFF7ED"
+      }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "315cd075-76f1-4e2f-b5bd-c4b3f271b42b"
+      }
+    }
+  }
+}
